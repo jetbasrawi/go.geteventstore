@@ -639,7 +639,7 @@ func TestReadFeedBackwardFromVersionWithTake(t *testing.T) {
 	setupSimulator(es)
 
 	ver := &StreamVersion{Number: 667}
-	take := &EventCount{Number: 14}
+	take := &Take{Number: 14}
 
 	evs, err := client.ReadFeedBackward(stream, ver, take)
 	if err != nil {
@@ -683,7 +683,7 @@ func TestReadFeedBackwardFromVersionWithTakeOutOfRangeUnder(t *testing.T) {
 	setupSimulator(es)
 
 	ver := &StreamVersion{Number: 49}
-	take := &EventCount{Number: 59}
+	take := &Take{Number: 59}
 
 	evs, err := client.ReadFeedBackward(stream, ver, take)
 	if err != nil {
@@ -803,7 +803,7 @@ func TestReadFeedForwardAll(t *testing.T) {
 
 func TestGetFeedURLForwardLowTake(t *testing.T) {
 	want := "/streams/some-stream/0/forward/10"
-	got, _ := getFeedURL("some-stream", "forward", nil, &EventCount{Number: 10})
+	got, _ := getFeedURL("some-stream", "forward", nil, &Take{Number: 10})
 	if got != want {
 		t.Errorf("Got %s Want %s", got, want)
 	}
@@ -811,7 +811,7 @@ func TestGetFeedURLForwardLowTake(t *testing.T) {
 
 func TestGetFeedURLBackwardLowTake(t *testing.T) {
 	want := "/streams/some-stream/head/backward/15"
-	got, _ := getFeedURL("some-stream", "backward", nil, &EventCount{Number: 15})
+	got, _ := getFeedURL("some-stream", "backward", nil, &Take{Number: 15})
 	if got != want {
 		t.Errorf("Got %s Want %s", got, want)
 	}

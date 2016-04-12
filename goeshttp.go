@@ -226,7 +226,7 @@ func (c *Client) getMetadataURL(stream string) (string, error) {
 	return "", nil
 }
 
-func (c *Client) ReadFeedForward(stream string, version *StreamVersion, take *EventCount) ([]*EventResponse, error) {
+func (c *Client) ReadFeedForward(stream string, version *StreamVersion, take *Take) ([]*EventResponse, error) {
 
 	url, err := getFeedURL(stream, "forward", version, take)
 	if err != nil {
@@ -285,7 +285,7 @@ func (c *Client) ReadFeedForward(stream string, version *StreamVersion, take *Ev
 	return e, nil
 }
 
-func (c *Client) ReadFeedBackward(stream string, version *StreamVersion, take *EventCount) ([]*EventResponse, error) {
+func (c *Client) ReadFeedBackward(stream string, version *StreamVersion, take *Take) ([]*EventResponse, error) {
 
 	url, err := getFeedURL(stream, "backward", version, take)
 	if err != nil {
@@ -456,7 +456,7 @@ func getEventURLs(f *atom.Feed) ([]string, error) {
 	return s, nil
 }
 
-func getFeedURL(stream, direction string, version *StreamVersion, take *EventCount) (string, error) {
+func getFeedURL(stream, direction string, version *StreamVersion, take *Take) (string, error) {
 
 	ps := 100
 	if take != nil && take.Number < ps {
@@ -495,6 +495,6 @@ type StreamVersion struct {
 	Number int
 }
 
-type EventCount struct {
+type Take struct {
 	Number int
 }
