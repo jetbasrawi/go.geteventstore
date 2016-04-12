@@ -1,13 +1,16 @@
 package goes
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -86,7 +89,7 @@ func TestNewRequest(t *testing.T) {
 	inURL, outURL := "/foo", defaultBaseURL+"foo"
 	inBody := &Event{EventID: "some-uuid", EventType: "SomeEventType", Data: "some-string"}
 	outBody := eventStructJSON + "\n"
-	req, _ := c.NewRequest("GET", inURL, inBody)
+	req, _ := c.newRequest("GET", inURL, inBody)
 
 	contentType := "application/vnd.eventstore.events+json"
 
@@ -113,7 +116,7 @@ func TestNewRequest_invalidJSON(t *testing.T) {
 	type T struct {
 		A map[int]interface{}
 	}
-	_, err := c.NewRequest("GET", "/", &T{})
+	_, err := c.newRequest("GET", "/", &T{})
 
 	if err == nil {
 		t.Error("Expected error to be returned.")
@@ -126,7 +129,7 @@ func TestNewRequest_invalidJSON(t *testing.T) {
 
 func TestNewRequest_badURL(t *testing.T) {
 	c, _ := NewClient(nil, defaultBaseURL)
-	_, err := c.NewRequest("GET", ":", nil)
+	_, err := c.newRequest("GET", ":", nil)
 	testURLParseError(t, err)
 }
 
@@ -138,7 +141,7 @@ func TestNewRequest_badURL(t *testing.T) {
 // subtle errors.
 func TestNewRequest_emptyBody(t *testing.T) {
 	c, _ := NewClient(nil, defaultBaseURL)
-	req, err := c.NewRequest("GET", "/", nil)
+	req, err := c.newRequest("GET", "/", nil)
 	if err != nil {
 		t.Fatalf("NewRequest returned unexpected error: %v", err)
 	}
@@ -162,7 +165,7 @@ func TestDo(t *testing.T) {
 
 	})
 
-	req, _ := client.NewRequest("POST", "/", nil)
+	req, _ := client.newRequest("POST", "/", nil)
 
 	resp, err := client.do(req, nil)
 	if err != nil {
@@ -217,58 +220,207 @@ func TestNewEvent(t *testing.T) {
 
 }
 
-func Test_PostEvent(t *testing.T) {
+func TestAppendEventMetadata(t *testing.T) {
+
 	setup()
 	defer teardown()
 
-	uuid, _ := NewUUID()
-	eventType := "SomeEventType"
-	data := &MyDataType{Field1: 655, Field2: "Some String"}
+	et := "SomeEventType"
+	stream := "Some-Stream"
 
-	event := client.NewEvent(uuid, eventType, data)
+	fURL := fmt.Sprintf("/streams/%s/head/backward/100", stream)
+	fullURL := fmt.Sprintf("%s%s", server.URL, fURL)
+	mux.HandleFunc(fURL, func(w http.ResponseWriter, r *http.Request) {
+		es := createTestEvents(1, stream, server.URL, et)
+		f, _ := createTestFeed(es, fullURL)
+		fmt.Fprint(w, f.PrettyPrint())
+	})
 
-	streamName := "some-stream"
-	url := fmt.Sprintf("/streams/%s", streamName)
+	ml := fmt.Sprintf("{\"baz\": \"boo\"}")
+	m := json.RawMessage(ml)
+	evID, _ := NewUUID()
+	meta := &MetaData{EventID: evID, EventType: et, Data: &m}
+
+	url := fmt.Sprintf("/streams/%s/metadata", stream)
 
 	mux.HandleFunc(url, func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "POST")
 
-		gotData := new(MyDataType)
-		err := json.NewDecoder(r.Body).Decode(gotData)
+		var mg json.RawMessage
+		g := MetaData{Data: &mg}
+		_ = json.NewDecoder(r.Body).Decode(&g)
+		i, _ := json.MarshalIndent(g, "", "	")
+		fmt.Println(i)
+
+		w.WriteHeader(http.StatusCreated)
+		fmt.Fprint(w, "")
+	})
+
+	resp, err := client.UpdateMetaData(stream, meta)
+	if err != nil {
+		t.Errorf("UpdateMetadata returned error: %v", err)
+	}
+
+	if resp.StatusMessage != "201 Created" {
+		t.Errorf("Status Message incorrect. Got: %s, want %s", resp.StatusMessage, "201 Created")
+	}
+
+	if resp.StatusCode != http.StatusCreated {
+		t.Errorf("Status Message incorrect. Got: %d, want %d", resp.StatusCode, 201)
+	}
+
+}
+func TestAppendEventsSingle(t *testing.T) {
+
+	setup()
+	defer teardown()
+
+	data := &MyDataType{Field1: 445, Field2: "Some string"}
+	et := "SomeEventType"
+
+	ev := client.NewEvent("", et, data)
+
+	stream := "Some-Stream"
+
+	url := fmt.Sprintf("/streams/%s", stream)
+
+	mux.HandleFunc(url, func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "POST")
+
+		b, _ := ioutil.ReadAll(r.Body)
+
+		se := []Event{}
+		err := json.NewDecoder(bytes.NewReader(b)).Decode(&se)
 		if err != nil {
 			t.Error("Unexpected error decoding event data")
 		}
 
-		if !reflect.DeepEqual(gotData, data) {
-			t.Errorf("Data not parsed correctly. Got %#v, want %#v", gotData, data)
+		gtev := se[0]
+		if !reflect.DeepEqual(gtev.PrettyPrint(), ev.PrettyPrint()) {
+			t.Errorf("Data not parsed correctly. Got %#v, want %#v", gtev, ev)
 		}
 
-		eventID := r.Header.Get("ES-EventId")
-		if eventID != event.EventID {
-			t.Errorf("EventID not set correctly on header. Got %s, want %s", eventID, event.EventID)
-		}
-
-		eventType := r.Header.Get("ES-EventType")
-		if eventType != event.EventType {
-			t.Errorf("EventType not set correctly on header. Got %s, want %s", eventType, event.EventType)
+		mt := "application/vnd.eventstore.events+json"
+		mediaType := r.Header.Get("Content-Type")
+		if mediaType != mt {
+			t.Errorf("EventType not set correctly on header. Got %s, want %s", mediaType, mt)
 		}
 
 		w.WriteHeader(http.StatusCreated)
 		fmt.Fprint(w, "")
 	})
 
-	resp, err := client.PostEvent(streamName, event)
+	resp, err := client.AppendToStream(stream, nil, ev)
 	if err != nil {
 		t.Errorf("Events.PostEvent returned error: %v", err)
 	}
 
 	if resp.StatusMessage != "201 Created" {
-		t.Errorf("Status Message incorrect. Got: %s, want %s", "201 Created")
-
+		t.Errorf("Status Message incorrect. Got: %s, want %s", resp.StatusMessage, "201 Created")
 	}
 
 	if resp.StatusCode != http.StatusCreated {
-		t.Errorf("Status Message incorrect. Got: %s, want %s", "201 Created")
+		t.Errorf("Status Message incorrect. Got: %d, want %d", resp.StatusCode, 201)
+	}
+
+}
+func TestAppendEventsMultiple(t *testing.T) {
+
+	setup()
+	defer teardown()
+
+	et := "SomeEventType"
+	d1 := &MyDataType{Field1: 445, Field2: "Some string"}
+	d2 := &MyDataType{Field1: 446, Field2: "Some other string"}
+	ev1 := client.NewEvent("", et, d1)
+	ev2 := client.NewEvent("", et, d2)
+
+	stream := "Some-Stream"
+	url := fmt.Sprintf("/streams/%s", stream)
+
+	mux.HandleFunc(url, func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "POST")
+
+		b, _ := ioutil.ReadAll(r.Body)
+
+		se := []Event{}
+		err := json.NewDecoder(bytes.NewReader(b)).Decode(&se)
+		if err != nil {
+			t.Error("Unexpected error decoding event data")
+		}
+
+		gt1 := se[0]
+		if !reflect.DeepEqual(gt1.PrettyPrint(), ev1.PrettyPrint()) {
+			t.Errorf("Data not parsed correctly. Got %#v, want %#v", gt1, ev1)
+		}
+		gt2 := se[1]
+		if !reflect.DeepEqual(gt2.PrettyPrint(), ev2.PrettyPrint()) {
+			t.Errorf("Data not parsed correctly. Got %#v, want %#v", gt2, ev2)
+		}
+
+		mt := "application/vnd.eventstore.events+json"
+		mediaType := r.Header.Get("Content-Type")
+		if mediaType != mt {
+			t.Errorf("EventType not set correctly on header. Got %s, want %s", mediaType, mt)
+		}
+
+		w.WriteHeader(http.StatusCreated)
+		fmt.Fprint(w, "")
+	})
+
+	resp, err := client.AppendToStream(stream, nil, ev1, ev2)
+	if err != nil {
+		t.Errorf("Events.PostEvent returned error: %v", err)
+	}
+
+	if resp.StatusMessage != "201 Created" {
+		t.Errorf("Status Message incorrect. Got: %s, want %s", resp.StatusMessage, "201 Created")
+	}
+
+	if resp.StatusCode != http.StatusCreated {
+		t.Errorf("Status Message incorrect. Got: %d, want %d", resp.StatusCode, 201)
+	}
+
+}
+
+func TestAppendEventsWithExpectedVersion(t *testing.T) {
+
+	setup()
+	defer teardown()
+
+	data := &MyDataType{Field1: 445, Field2: "Some string"}
+	et := "SomeEventType"
+	ev := client.NewEvent("", et, data)
+
+	stream := "Some-Stream"
+	url := fmt.Sprintf("/streams/%s", stream)
+
+	expectedVersion := &StreamVersion{Number: 5}
+
+	mux.HandleFunc(url, func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "POST")
+
+		want := strconv.Itoa(expectedVersion.Number)
+		got := r.Header.Get("ES-ExpectedVersion")
+		if got != want {
+			t.Errorf("Expected Version not set correctly on header. Got %s, want %s", got, want)
+		}
+
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprint(w, "")
+	})
+
+	resp, err := client.AppendToStream(stream, expectedVersion, ev)
+	if err == nil {
+		t.Error("Expecting an error")
+	}
+
+	if resp.StatusMessage != "400 Bad Request" {
+		t.Errorf("Status Message incorrect. Got: %s, want %s", resp.StatusMessage, "400 Bad Request")
+	}
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("Status Message incorrect. Got: %d, want %d", resp.StatusCode, 400)
 	}
 
 }
@@ -340,7 +492,7 @@ func TestGetEvent(t *testing.T) {
 	es := createTestEvents(1, stream, server.URL, "SomeEventType")
 	ti := Time(time.Now())
 
-	want, _ := createTestEventR(es[0], &ti)
+	want, _ := createTestEventResponse(es[0], &ti)
 
 	er, _ := createTestEventAtomResponse(es[0], &ti)
 	str := er.PrettyPrint()
@@ -650,7 +802,6 @@ func TestReadFeedForwardAll(t *testing.T) {
 }
 
 func TestGetFeedURLForwardLowTake(t *testing.T) {
-
 	want := "/streams/some-stream/0/forward/10"
 	got, _ := getFeedURL("some-stream", "forward", nil, &EventCount{Number: 10})
 	if got != want {
@@ -659,24 +810,29 @@ func TestGetFeedURLForwardLowTake(t *testing.T) {
 }
 
 func TestGetFeedURLBackwardLowTake(t *testing.T) {
-
 	want := "/streams/some-stream/head/backward/15"
 	got, _ := getFeedURL("some-stream", "backward", nil, &EventCount{Number: 15})
 	if got != want {
 		t.Errorf("Got %s Want %s", got, want)
 	}
 }
-func TestGetFeedURLBackwardNilAll(t *testing.T) {
 
+func TestGetFeedURLInvalidDirection(t *testing.T) {
+	want := errors.New("Invalid Direction")
+	_, got := getFeedURL("some-stream", "nonesense", nil, nil)
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Got %s Want %s", got, want)
+	}
+}
+func TestGetFeedURLBackwardNilAll(t *testing.T) {
 	want := "/streams/some-stream/head/backward/100"
-	got, _ := getFeedURL("some-stream", "backward", nil, nil)
+	got, _ := getFeedURL("some-stream", "", nil, nil)
 	if got != want {
 		t.Errorf("Got %s Want %s", got, want)
 	}
 }
 
 func TestGetFeedURLForwardNilAll(t *testing.T) {
-
 	want := "/streams/some-stream/0/forward/100"
 	got, _ := getFeedURL("some-stream", "forward", nil, nil)
 	if got != want {
@@ -685,7 +841,6 @@ func TestGetFeedURLForwardNilAll(t *testing.T) {
 }
 
 func TestGetFeedURLForwardVersioned(t *testing.T) {
-
 	want := "/streams/some-stream/15/forward/100"
 	got, _ := getFeedURL("some-stream", "forward", &StreamVersion{Number: 15}, nil)
 	if got != want {

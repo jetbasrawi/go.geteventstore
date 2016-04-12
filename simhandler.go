@@ -99,7 +99,7 @@ func resolveEvent(events []*Event, url string) (*Event, error) {
 	return events[i], nil
 }
 
-func createTestEventR(e *Event, tm *TimeStr) (*EventResponse, error) {
+func createTestEventResponse(e *Event, tm *TimeStr) (*EventResponse, error) {
 
 	timeStr := Time(time.Now())
 	if tm != nil {
@@ -167,6 +167,10 @@ func createTestEvents(numEvents int, stream string, server string, eventTypes ..
 		l2 := Link{URI: eu, Relation: "alternate"}
 		ls := []Link{l1, l2}
 		e.Links = ls
+
+		m := fmt.Sprintf("{\"bar\": \"%s\"}", uuid)
+		mraw := json.RawMessage(m)
+		e.MetaData = &mraw
 
 		se = append(se, &e)
 

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -53,7 +54,7 @@ func NewClient(httpClient *http.Client, serverURL string) (*Client, error) {
 	return c, nil
 }
 
-func (c *Client) NewRequest(method, urlString string, body interface{}) (*http.Request, error) {
+func (c *Client) newRequest(method, urlString string, body interface{}) (*http.Request, error) {
 
 	url, err := url.Parse(urlString)
 	if err != nil {
@@ -83,7 +84,7 @@ func (c *Client) NewRequest(method, urlString string, body interface{}) (*http.R
 	return req, nil
 }
 
-func CheckResponse(r *http.Response) error {
+func checkResponse(r *http.Response) error {
 	if c := r.StatusCode; 200 <= c && c <= 299 {
 		return nil
 	}
@@ -121,7 +122,7 @@ func (c *Client) do(req *http.Request, v interface{}) (*Response, error) {
 
 	response := newResponse(resp)
 
-	err = CheckResponse(resp)
+	err = checkResponse(resp)
 	if err != nil {
 		// even though there was an error, we still return the response
 		// in case the caller wants to inspect it further
@@ -162,17 +163,20 @@ func (c *Client) NewEvent(eventId, eventType string, data interface{}) *Event {
 	return e
 }
 
-func (c *Client) PostEvent(streamName string, event *Event) (*Response, error) {
+func (c *Client) AppendToStream(streamName string, expectedVersion *StreamVersion, events ...*Event) (*Response, error) {
 
 	u := fmt.Sprintf("/streams/%s", streamName)
 
-	req, err := c.NewRequest("POST", u, event.Data)
+	req, err := c.newRequest("POST", u, events)
 	if err != nil {
 		return nil, err
 	}
 
-	req.Header.Set("ES-EventType", event.EventType)
-	req.Header.Set("ES-EventId", event.EventID)
+	req.Header.Set("Content-Type", "application/vnd.eventstore.events+json")
+
+	if expectedVersion != nil {
+		req.Header.Set("ES-ExpectedVersion", strconv.Itoa(expectedVersion.Number))
+	}
 
 	resp, err := c.do(req, nil)
 	if err != nil {
@@ -180,6 +184,46 @@ func (c *Client) PostEvent(streamName string, event *Event) (*Response, error) {
 	}
 
 	return resp, nil
+}
+
+func (c *Client) UpdateMetaData(stream string, metadata ...*MetaData) (*Response, error) {
+
+	mURL, err := c.getMetadataURL(stream)
+	if err != nil {
+		return nil, err
+	}
+	req, err := c.newRequest("POST", mURL, metadata)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Content-Type", "application/vnd.eventstore.events+json")
+
+	resp, err := c.do(req, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, nil
+}
+
+func (c *Client) getMetadataURL(stream string) (string, error) {
+
+	url, err := getFeedURL(stream, "backward", nil, nil)
+	if err != nil {
+		return "", err
+	}
+
+	f, _, err := c.readFeed(url)
+	if err != nil {
+		return "", err
+	}
+	for _, v := range f.Link {
+		if v.Rel == "metadata" {
+			return v.Href, nil
+		}
+	}
+	return "", nil
 }
 
 func (c *Client) ReadFeedForward(stream string, version *StreamVersion, take *EventCount) ([]*EventResponse, error) {
@@ -319,7 +363,7 @@ func (c *Client) GetEvents(urls []string) ([]*EventResponse, *Response, error) {
 
 func (c *Client) GetEvent(url string) (*EventResponse, *Response, error) {
 
-	r, err := c.NewRequest("GET", url, nil)
+	r, err := c.newRequest("GET", url, nil)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -348,7 +392,8 @@ func (c *Client) GetEvent(url string) (*EventResponse, *Response, error) {
 	}
 
 	var d json.RawMessage
-	ev := &Event{Data: &d}
+	var m json.RawMessage
+	ev := &Event{Data: &d, MetaData: &m}
 
 	err = json.Unmarshal(raw, ev)
 	if err != nil {
@@ -368,7 +413,7 @@ func (c *Client) GetEvent(url string) (*EventResponse, *Response, error) {
 
 func (c *Client) readFeed(url string) (*atom.Feed, *Response, error) {
 
-	req, err := c.NewRequest("GET", url, nil)
+	req, err := c.newRequest("GET", url, nil)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -417,6 +462,20 @@ func getFeedURL(stream, direction string, version *StreamVersion, take *EventCou
 	if take != nil && take.Number < ps {
 		ps = take.Number
 	}
+	dir := ""
+	switch direction {
+	case "":
+		if version != nil && version.Number == 0 {
+			dir = "forward"
+		} else {
+			dir = "backward"
+		}
+
+	case "forward", "backward":
+		dir = direction
+	default:
+		return "", errors.New("Invalid Direction")
+	}
 
 	ver := "head"
 	if version != nil {
@@ -424,11 +483,11 @@ func getFeedURL(stream, direction string, version *StreamVersion, take *EventCou
 			return "", invalidVersionError(version.Number)
 		}
 		ver = strconv.Itoa(version.Number)
-	} else if direction == "forward" {
+	} else if dir == "forward" {
 		ver = "0"
 	}
 
-	return fmt.Sprintf("/streams/%s/%s/%s/%d", stream, ver, direction, ps), nil
+	return fmt.Sprintf("/streams/%s/%s/%s/%d", stream, ver, dir, ps), nil
 
 }
 

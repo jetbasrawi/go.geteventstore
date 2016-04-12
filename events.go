@@ -62,6 +62,12 @@ func (e *Event) PrettyPrint() string {
 	return string(b)
 }
 
+type MetaData struct {
+	EventType string      `json:"eventType"`
+	EventID   string      `json:"eventId"`
+	Data      interface{} `json:"data"`
+}
+
 type Link struct {
 	URI      string `json:"uri"`
 	Relation string `json:"relation"`
