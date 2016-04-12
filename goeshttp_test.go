@@ -541,11 +541,33 @@ func TestRunServer(t *testing.T) {
 
 	setupSimulator(es)
 
-	_, err := client.ReadFeedBackward(stream, nil, nil)
+	_, _, err := client.ReadFeedBackward(stream, nil, nil)
 	if err != nil {
 		t.Errorf("Unexpected error: %s", err)
 	}
 
+}
+
+func TestReadFeedBackwardError(t *testing.T) {
+	setup()
+	defer teardown()
+
+	stream := "ABigStream"
+	errWant := errors.New("Stream Does Not Exist")
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+
+		http.Error(w, errWant.Error(), http.StatusNotFound)
+
+	})
+
+	_, resp, err := client.ReadFeedBackward(stream, nil, nil)
+	if err == nil {
+		t.Errorf("Got %v Want %v", err, errWant)
+	}
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("Got %v Want %v", resp.StatusCode, http.StatusNotFound)
+	}
 }
 
 func TestReadFeedBackwardFromVersionAll(t *testing.T) {
@@ -560,7 +582,7 @@ func TestReadFeedBackwardFromVersionAll(t *testing.T) {
 
 	ver := &StreamVersion{Number: 100}
 
-	evs, err := client.ReadFeedBackward(stream, ver, nil)
+	evs, _, err := client.ReadFeedBackward(stream, ver, nil)
 	if err != nil {
 		t.Errorf("Unexpected Error %s", err.Error())
 	}
@@ -600,7 +622,7 @@ func TestReadFeedBackwardAll(t *testing.T) {
 
 	setupSimulator(es)
 
-	evs, err := client.ReadFeedBackward(stream, nil, nil)
+	evs, _, err := client.ReadFeedBackward(stream, nil, nil)
 	if err != nil {
 		t.Errorf("Unexpected Error %s", err.Error())
 	}
@@ -628,6 +650,27 @@ func TestReadFeedBackwardAll(t *testing.T) {
 
 }
 
+func TestReadFeedForwardError(t *testing.T) {
+	setup()
+	defer teardown()
+
+	stream := "ABigStream"
+	errWant := errors.New("Stream Does Not Exist")
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+
+		http.Error(w, errWant.Error(), http.StatusNotFound)
+
+	})
+
+	_, resp, err := client.ReadFeedForward(stream, nil, nil)
+	if err == nil {
+		t.Errorf("Got %v Want %v", err, errWant)
+	}
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("Got %v Want %v", resp.StatusCode, http.StatusNotFound)
+	}
+}
 func TestReadFeedBackwardFromVersionWithTake(t *testing.T) {
 	setup()
 	defer teardown()
@@ -641,7 +684,7 @@ func TestReadFeedBackwardFromVersionWithTake(t *testing.T) {
 	ver := &StreamVersion{Number: 667}
 	take := &Take{Number: 14}
 
-	evs, err := client.ReadFeedBackward(stream, ver, take)
+	evs, _, err := client.ReadFeedBackward(stream, ver, take)
 	if err != nil {
 		t.Errorf("Unexpected Error %s", err.Error())
 	}
@@ -685,7 +728,7 @@ func TestReadFeedBackwardFromVersionWithTakeOutOfRangeUnder(t *testing.T) {
 	ver := &StreamVersion{Number: 49}
 	take := &Take{Number: 59}
 
-	evs, err := client.ReadFeedBackward(stream, ver, take)
+	evs, _, err := client.ReadFeedBackward(stream, ver, take)
 	if err != nil {
 		t.Errorf("Unexpected Error %s", err.Error())
 	}
@@ -730,7 +773,7 @@ func TestReadFeedForwardTail(t *testing.T) {
 
 	ver := &StreamVersion{Number: 1000}
 
-	evs, err := client.ReadFeedForward(stream, ver, nil)
+	evs, _, err := client.ReadFeedForward(stream, ver, nil)
 	if err != nil {
 		t.Errorf("Unexpected Error %s", err.Error())
 	}
@@ -768,7 +811,7 @@ func TestReadFeedForwardAll(t *testing.T) {
 
 	setupSimulator(es)
 
-	evs, err := client.ReadFeedForward(stream, nil, nil)
+	evs, _, err := client.ReadFeedForward(stream, nil, nil)
 	if err != nil {
 		t.Errorf("Unexpected Error %s", err.Error())
 	}

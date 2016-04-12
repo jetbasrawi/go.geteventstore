@@ -226,24 +226,24 @@ func (c *Client) getMetadataURL(stream string) (string, error) {
 	return "", nil
 }
 
-func (c *Client) ReadFeedForward(stream string, version *StreamVersion, take *Take) ([]*EventResponse, error) {
+func (c *Client) ReadFeedForward(stream string, version *StreamVersion, take *Take) ([]*EventResponse, *Response, error) {
 
 	url, err := getFeedURL(stream, "forward", version, take)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	urls := []string{}
 
 	for {
-		f, _, err := c.readFeed(url)
+		f, resp, err := c.readFeed(url)
 		if err != nil {
-			return nil, err
+			return nil, resp, err
 		}
 
 		u, err := getEventURLs(f)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if len(u) <= 0 {
 			break
@@ -272,39 +272,38 @@ func (c *Client) ReadFeedForward(stream string, version *StreamVersion, take *Ta
 
 	e, _, err := c.GetEvents(urls)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if take != nil {
 		d := len(e) - take.Number
 		if d < 0 {
-			return e, nil
+			return e, nil, nil
 		}
-		return e[:take.Number], nil
+		return e[:take.Number], nil, nil
 	}
 
-	return e, nil
+	return e, nil, nil
 }
 
-func (c *Client) ReadFeedBackward(stream string, version *StreamVersion, take *Take) ([]*EventResponse, error) {
+func (c *Client) ReadFeedBackward(stream string, version *StreamVersion, take *Take) ([]*EventResponse, *Response, error) {
 
 	url, err := getFeedURL(stream, "backward", version, take)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	urls := []string{}
 	for {
 
-		f, _, err := c.readFeed(url)
+		f, resp, err := c.readFeed(url)
 		if err != nil {
-			log.Printf("Error reading feed %#v\n", err)
-			return nil, err
+			return nil, resp, err
 		}
 
 		u, err := getEventURLs(f)
 		if err != nil {
 			log.Printf("Error getting event URLs %#v\n", err)
-			return nil, err
+			return nil, nil, err
 		}
 		if len(u) <= 0 {
 			break
@@ -329,21 +328,21 @@ func (c *Client) ReadFeedBackward(stream string, version *StreamVersion, take *T
 		}
 	}
 
-	e, _, err := c.GetEvents(urls)
+	e, resp, err := c.GetEvents(urls)
 	if err != nil {
 		log.Printf("Error getting events %#v\n", err)
-		return nil, err
+		return nil, resp, err
 	}
 
 	if take != nil {
 		d := len(e) - take.Number
 		if d < 0 {
-			return e, nil
+			return e, nil, nil
 		}
-		return e[:take.Number], nil
+		return e[:take.Number], nil, nil
 	}
 
-	return e, nil
+	return e, nil, nil
 }
 
 func (c *Client) GetEvents(urls []string) ([]*EventResponse, *Response, error) {
