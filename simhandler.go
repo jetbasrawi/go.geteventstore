@@ -141,6 +141,32 @@ func createTestEventAtomResponse(e *Event, tm *TimeStr) (*eventAtomResponse, err
 	return r, nil
 }
 
+func createTestEvent(stream, server, eventType string, eventNumber int, data *json.RawMessage, meta *json.RawMessage) *Event {
+
+	e := Event{}
+	e.EventStreamID = stream
+	e.EventNumber = eventNumber
+	e.EventType = eventType
+
+	uuid, _ := NewUUID()
+	e.EventID = uuid
+
+	e.Data = data
+
+	u := fmt.Sprintf("%s/streams/%s", server, stream)
+	eu := fmt.Sprintf("%s/%d/", u, eventNumber)
+	l1 := Link{URI: eu, Relation: "edit"}
+	l2 := Link{URI: eu, Relation: "alternate"}
+	ls := []Link{l1, l2}
+	e.Links = ls
+
+	if meta != nil {
+		e.MetaData = meta
+	}
+	return &e
+
+}
+
 func createTestEvents(numEvents int, stream string, server string, eventTypes ...string) []*Event {
 
 	se := []*Event{}
@@ -149,34 +175,57 @@ func createTestEvents(numEvents int, stream string, server string, eventTypes ..
 		r := rand.Intn(len(eventTypes))
 		eventType := eventTypes[r]
 
-		e := Event{}
-		e.EventStreamID = stream
-		e.EventNumber = i
-		e.EventType = eventType
-
-		uuid, _ := NewUUID()
-		e.EventID = uuid
-
 		d := fmt.Sprintf("{ \"foo\" : %d }", rand.Intn(9999))
 		raw := json.RawMessage(d)
-		e.Data = &raw
 
-		u := fmt.Sprintf("%s/streams/%s", server, stream)
-		eu := fmt.Sprintf("%s/%d/", u, i)
-		l1 := Link{URI: eu, Relation: "edit"}
-		l2 := Link{URI: eu, Relation: "alternate"}
-		ls := []Link{l1, l2}
-		e.Links = ls
-
+		uuid, _ := NewUUID()
 		m := fmt.Sprintf("{\"bar\": \"%s\"}", uuid)
 		mraw := json.RawMessage(m)
-		e.MetaData = &mraw
 
-		se = append(se, &e)
+		e := createTestEvent(stream, server, eventType, i, &raw, &mraw)
+
+		se = append(se, e)
 
 	}
 	return se
 }
+
+//func createTestEvents(numEvents int, stream string, server string, eventTypes ...string) []*Event {
+
+//se := []*Event{}
+
+//for i := 0; i < numEvents; i++ {
+//r := rand.Intn(len(eventTypes))
+//eventType := eventTypes[r]
+
+//e := Event{}
+//e.EventStreamID = stream
+//e.EventNumber = i
+//e.EventType = eventType
+
+//uuid, _ := NewUUID()
+//e.EventID = uuid
+
+//d := fmt.Sprintf("{ \"foo\" : %d }", rand.Intn(9999))
+//raw := json.RawMessage(d)
+//e.Data = &raw
+
+//u := fmt.Sprintf("%s/streams/%s", server, stream)
+//eu := fmt.Sprintf("%s/%d/", u, i)
+//l1 := Link{URI: eu, Relation: "edit"}
+//l2 := Link{URI: eu, Relation: "alternate"}
+//ls := []Link{l1, l2}
+//e.Links = ls
+
+//m := fmt.Sprintf("{\"bar\": \"%s\"}", uuid)
+//mraw := json.RawMessage(m)
+//e.MetaData = &mraw
+
+//se = append(se, &e)
+
+//}
+//return se
+//}
 
 func getSliceSection(es []*Event, ver *StreamVersion, pageSize int, direction string) ([]*Event, bool, bool) {
 

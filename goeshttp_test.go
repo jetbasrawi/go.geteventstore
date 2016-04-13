@@ -220,6 +220,13 @@ func TestNewEvent(t *testing.T) {
 
 }
 
+func TestGetMetaData(t *testing.T) {
+	setup()
+	defer teardown()
+
+	//setupSimulator(nil, )
+}
+
 func TestAppendEventMetadata(t *testing.T) {
 
 	setup()
