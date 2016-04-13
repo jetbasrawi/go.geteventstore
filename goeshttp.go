@@ -136,6 +136,7 @@ func (c *Client) do(req *http.Request, v interface{}) (*Response, error) {
 		} else {
 			i, _ := ioutil.ReadAll(resp.Body)
 			fmt.Println("Decoding %s", string(i))
+			//TODO
 			//err := json.NewDecoder(bytes.NewReader(i)).Decode(v)
 			err := json.Unmarshal(i, v)
 			if err == io.EOF {
@@ -386,22 +387,18 @@ func (c *Client) GetEvent(url string) (*EventResponse, *Response, error) {
 	if err != nil {
 		log.Println("Error processing request")
 		return nil, resp, err
-
 	}
 
 	var raw json.RawMessage
 	er := &eventAtomResponse{Content: &raw}
 	err = json.NewDecoder(bytes.NewReader(b.Bytes())).Decode(er)
 	if err == io.EOF {
-		log.Println(err)
-		err = nil
-
+		return nil, resp, nil
 	}
 
 	if err != nil {
 		log.Printf("unmarshallEventResponse Error: %s", err)
 		return nil, resp, err
-
 	}
 
 	var d json.RawMessage
@@ -409,9 +406,12 @@ func (c *Client) GetEvent(url string) (*EventResponse, *Response, error) {
 	ev := &Event{Data: &d, MetaData: &m}
 
 	err = json.Unmarshal(raw, ev)
+	if err == io.EOF {
+		log.Println(err)
+		err = nil
+	}
 	if err != nil {
-		log.Printf("unmarshalEvent: %s ", err)
-
+		log.Printf("GetEvent: %#v\n", err)
 	}
 
 	e := EventResponse{}

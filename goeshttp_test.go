@@ -221,6 +221,30 @@ func TestNewEvent(t *testing.T) {
 
 }
 
+func TestGetMetaDataEmpty(t *testing.T) {
+	setup()
+	defer teardown()
+
+	stream := "Some-Stream"
+
+	es := createTestEvents(10, stream, server.URL, "EventTypeX")
+
+	setupSimulator(es, nil)
+
+	got, resp, err := client.GetStreamMetaData(stream)
+	if err != nil {
+		t.Errorf("Unexpected error: %s\n", err)
+	}
+
+	if got != nil {
+		t.Errorf("Want %v\n, Got: %v\n", nil, got)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Got: %d Want %d\n", resp.StatusCode, http.StatusOK)
+	}
+}
+
 func TestGetMetaData(t *testing.T) {
 	setup()
 	defer teardown()
@@ -232,13 +256,18 @@ func TestGetMetaData(t *testing.T) {
 
 	es := createTestEvents(10, stream, server.URL, "EventTypeX")
 	m := createTestEvent(stream, server.URL, "metadata", 10, &raw, nil)
+	want, _ := createTestEventResponse(m, nil)
 
-	fmt.Printf("M: %+v", m)
+	//fmt.Printf("M: %+v", m)
 
 	setupSimulator(es, m)
 
 	got, _, _ := client.GetStreamMetaData(stream)
-	fmt.Printf("Meta: %s", got.PrettyPrint())
+	if !reflect.DeepEqual(got.PrettyPrint(), want.PrettyPrint()) {
+		t.Errorf("Got: %s\n Want %s\n ", got.PrettyPrint(), want.PrettyPrint())
+	}
+	//fmt.Printf("Got: %s\n", got.PrettyPrint())
+	//fmt.Printf("Want: %s\n", want.PrettyPrint())
 
 }
 

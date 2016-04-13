@@ -91,12 +91,14 @@ func (h ESHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if mr.MatchString(ru.String()) {
+		if h.MetaData == nil {
+			return
+		}
 		m, err := createTestEventAtomResponse(h.MetaData, nil)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		fmt.Printf("Handling Meta: %s\n", m.PrettyPrint())
 		fmt.Fprint(w, m.PrettyPrint())
 	}
 }
