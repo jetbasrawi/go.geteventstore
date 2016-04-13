@@ -30,8 +30,9 @@ type esRequest struct {
 }
 
 type ESHandler struct {
-	Events  []*Event
-	BaseURL *url.URL
+	Events   []*Event
+	BaseURL  *url.URL
+	MetaData *Event
 }
 
 func (h ESHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -81,6 +82,22 @@ func (h ESHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		fmt.Fprint(w, er.PrettyPrint())
+	}
+
+	//Metadata request
+	mr, err := regexp.Compile("streams\\/[^\\/]+\\/metadata")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if mr.MatchString(ru.String()) {
+		m, err := createTestEventAtomResponse(h.MetaData, nil)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		fmt.Printf("Handling Meta: %s\n", m.PrettyPrint())
+		fmt.Fprint(w, m.PrettyPrint())
 	}
 }
 
@@ -162,6 +179,10 @@ func createTestEvent(stream, server, eventType string, eventNumber int, data *js
 
 	if meta != nil {
 		e.MetaData = meta
+	} else {
+		m := "\"\""
+		mraw := json.RawMessage(m)
+		e.MetaData = &mraw
 	}
 	return &e
 
@@ -189,43 +210,6 @@ func createTestEvents(numEvents int, stream string, server string, eventTypes ..
 	}
 	return se
 }
-
-//func createTestEvents(numEvents int, stream string, server string, eventTypes ...string) []*Event {
-
-//se := []*Event{}
-
-//for i := 0; i < numEvents; i++ {
-//r := rand.Intn(len(eventTypes))
-//eventType := eventTypes[r]
-
-//e := Event{}
-//e.EventStreamID = stream
-//e.EventNumber = i
-//e.EventType = eventType
-
-//uuid, _ := NewUUID()
-//e.EventID = uuid
-
-//d := fmt.Sprintf("{ \"foo\" : %d }", rand.Intn(9999))
-//raw := json.RawMessage(d)
-//e.Data = &raw
-
-//u := fmt.Sprintf("%s/streams/%s", server, stream)
-//eu := fmt.Sprintf("%s/%d/", u, i)
-//l1 := Link{URI: eu, Relation: "edit"}
-//l2 := Link{URI: eu, Relation: "alternate"}
-//ls := []Link{l1, l2}
-//e.Links = ls
-
-//m := fmt.Sprintf("{\"bar\": \"%s\"}", uuid)
-//mraw := json.RawMessage(m)
-//e.MetaData = &mraw
-
-//se = append(se, &e)
-
-//}
-//return se
-//}
 
 func getSliceSection(es []*Event, ver *StreamVersion, pageSize int, direction string) ([]*Event, bool, bool) {
 

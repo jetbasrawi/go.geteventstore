@@ -207,6 +207,20 @@ func (c *Client) UpdateMetaData(stream string, metadata ...*MetaData) (*Response
 	return resp, nil
 }
 
+func (c *Client) GetStreamMetaData(stream string) (*EventResponse, *Response, error) {
+
+	url, err := c.getMetadataURL(stream)
+	if err != nil {
+		return nil, nil, err
+	}
+	er, resp, err := c.GetEvent(url)
+	if err != nil {
+		return nil, resp, err
+	}
+
+	return er, resp, nil
+}
+
 func (c *Client) getMetadataURL(stream string) (string, error) {
 
 	url, err := getFeedURL(stream, "backward", nil, nil)

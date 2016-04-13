@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -41,9 +42,9 @@ func setup() {
 	client, _ = NewClient(nil, server.URL)
 }
 
-func setupSimulator(es []*Event) {
+func setupSimulator(es []*Event, m *Event) {
 	u, _ := url.Parse(server.URL)
-	handler := ESHandler{Events: es, BaseURL: u}
+	handler := ESHandler{Events: es, BaseURL: u, MetaData: m}
 	mux.Handle("/", handler)
 }
 
@@ -224,7 +225,21 @@ func TestGetMetaData(t *testing.T) {
 	setup()
 	defer teardown()
 
-	//setupSimulator(nil, )
+	d := fmt.Sprintf("{ \"foo\" : %d }", rand.Intn(9999))
+	raw := json.RawMessage(d)
+
+	stream := "Some-Stream"
+
+	es := createTestEvents(10, stream, server.URL, "EventTypeX")
+	m := createTestEvent(stream, server.URL, "metadata", 10, &raw, nil)
+
+	fmt.Printf("M: %+v", m)
+
+	setupSimulator(es, m)
+
+	got, _, _ := client.GetStreamMetaData(stream)
+	fmt.Printf("Meta: %s", got.PrettyPrint())
+
 }
 
 func TestAppendEventMetadata(t *testing.T) {
@@ -546,7 +561,7 @@ func TestRunServer(t *testing.T) {
 	stream := "astream"
 	es := createTestEvents(100, stream, server.URL, "EventTypeA", "EventTypeB")
 
-	setupSimulator(es)
+	setupSimulator(es, nil)
 
 	_, _, err := client.ReadFeedBackward(stream, nil, nil)
 	if err != nil {
@@ -585,7 +600,7 @@ func TestReadFeedBackwardFromVersionAll(t *testing.T) {
 	ne := 1000
 	es := createTestEvents(ne, stream, server.URL, "EventTypeX")
 
-	setupSimulator(es)
+	setupSimulator(es, nil)
 
 	ver := &StreamVersion{Number: 100}
 
@@ -627,7 +642,7 @@ func TestReadFeedBackwardAll(t *testing.T) {
 	ne := 1000
 	es := createTestEvents(ne, stream, server.URL, "EventTypeX")
 
-	setupSimulator(es)
+	setupSimulator(es, nil)
 
 	evs, _, err := client.ReadFeedBackward(stream, nil, nil)
 	if err != nil {
@@ -686,7 +701,7 @@ func TestReadFeedBackwardFromVersionWithTake(t *testing.T) {
 	ne := 1000
 	es := createTestEvents(ne, stream, server.URL, "EventTypeX")
 
-	setupSimulator(es)
+	setupSimulator(es, nil)
 
 	ver := &StreamVersion{Number: 667}
 	take := &Take{Number: 14}
@@ -730,7 +745,7 @@ func TestReadFeedBackwardFromVersionWithTakeOutOfRangeUnder(t *testing.T) {
 	ne := 1000
 	es := createTestEvents(ne, stream, server.URL, "EventTypeX")
 
-	setupSimulator(es)
+	setupSimulator(es, nil)
 
 	ver := &StreamVersion{Number: 49}
 	take := &Take{Number: 59}
@@ -776,7 +791,7 @@ func TestReadFeedForwardTail(t *testing.T) {
 	ne := 1000
 	es := createTestEvents(ne, stream, server.URL, "EventTypeX")
 
-	setupSimulator(es)
+	setupSimulator(es, nil)
 
 	ver := &StreamVersion{Number: 1000}
 
@@ -816,7 +831,7 @@ func TestReadFeedForwardAll(t *testing.T) {
 	ne := 1000
 	es := createTestEvents(ne, stream, server.URL, "EventTypeX")
 
-	setupSimulator(es)
+	setupSimulator(es, nil)
 
 	evs, _, err := client.ReadFeedForward(stream, nil, nil)
 	if err != nil {
