@@ -549,6 +549,14 @@ func TestGetEvent(t *testing.T) {
 	str := er.PrettyPrint()
 
 	mux.HandleFunc("/streams/some-stream/299", func(w http.ResponseWriter, r *http.Request) {
+
+		got := r.Header.Get("Accept")
+		want := "application/vnd.eventstore.atom+json"
+
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("Got: %s Want: %s", got, want)
+		}
+
 		fmt.Fprint(w, str)
 	})
 

@@ -382,6 +382,8 @@ func (c *Client) GetEvent(url string) (*EventResponse, *Response, error) {
 		return nil, nil, err
 	}
 
+	r.Header.Set("Accept", "application/vnd.eventstore.atom+json")
+
 	var b bytes.Buffer
 	resp, err := c.do(r, &b)
 	if err != nil {
