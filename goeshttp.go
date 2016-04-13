@@ -189,30 +189,31 @@ func (c *Client) AppendToStream(streamName string, expectedVersion *StreamVersio
 
 func (c *Client) UpdateMetaData(stream string, metadata ...*MetaData) (*Response, error) {
 
-	mURL, err := c.getMetadataURL(stream)
+	mURL, resp, err := c.getMetadataURL(stream)
 	if err != nil {
-		return nil, err
+		return resp, err
 	}
 	req, err := c.newRequest("POST", mURL, metadata)
 	if err != nil {
-		return nil, err
+		return resp, err
 	}
 
 	req.Header.Set("Content-Type", "application/vnd.eventstore.events+json")
 
-	resp, err := c.do(req, nil)
+	resp, err = c.do(req, nil)
 	if err != nil {
-		return nil, err
+		return resp, err
 	}
 
 	return resp, nil
 }
 
+// Response may be nil
 func (c *Client) GetStreamMetaData(stream string) (*EventResponse, *Response, error) {
 
-	url, err := c.getMetadataURL(stream)
+	url, resp, err := c.getMetadataURL(stream)
 	if err != nil {
-		return nil, nil, err
+		return nil, resp, err
 	}
 	er, resp, err := c.GetEvent(url)
 	if err != nil {
@@ -222,23 +223,23 @@ func (c *Client) GetStreamMetaData(stream string) (*EventResponse, *Response, er
 	return er, resp, nil
 }
 
-func (c *Client) getMetadataURL(stream string) (string, error) {
+func (c *Client) getMetadataURL(stream string) (string, *Response, error) {
 
 	url, err := getFeedURL(stream, "backward", nil, nil)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 
-	f, _, err := c.readFeed(url)
+	f, resp, err := c.readFeed(url)
 	if err != nil {
-		return "", err
+		return "", resp, err
 	}
 	for _, v := range f.Link {
 		if v.Rel == "metadata" {
-			return v.Href, nil
+			return v.Href, resp, nil
 		}
 	}
-	return "", nil
+	return "", resp, nil
 }
 
 func (c *Client) ReadFeedForward(stream string, version *StreamVersion, take *Take) ([]*EventResponse, *Response, error) {
