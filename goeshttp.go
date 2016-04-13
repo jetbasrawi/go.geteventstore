@@ -389,6 +389,9 @@ func (c *Client) GetEvent(url string) (*EventResponse, *Response, error) {
 		return nil, resp, err
 	}
 
+	if b.String() == "{}" {
+		return nil, resp, nil
+	}
 	var raw json.RawMessage
 	er := &eventAtomResponse{Content: &raw}
 	err = json.NewDecoder(bytes.NewReader(b.Bytes())).Decode(er)

@@ -92,6 +92,7 @@ func (h ESHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if mr.MatchString(ru.String()) {
 		if h.MetaData == nil {
+			fmt.Fprint(w, "{}")
 			return
 		}
 		m, err := createTestEventAtomResponse(h.MetaData, nil)
