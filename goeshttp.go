@@ -23,10 +23,14 @@ type Client struct {
 	BaseURL *url.URL
 }
 
+type Response struct {
+	*http.Response
+	StatusCode    int
+	StatusMessage string
+}
+
 /*
 An ErrorResponse reports one or more errors caused by an API request.
-
-GitHub API docs: http://developer.github.com/v3/#client-errors
 */
 type ErrorResponse struct {
 	Response   *http.Response // HTTP response that caused this error
@@ -38,6 +42,29 @@ func (r *ErrorResponse) Error() string {
 	return fmt.Sprintf("%v %v: %d %+v",
 		r.Response.Request.Method, r.Response.Request.URL,
 		r.Response.StatusCode, r.Message)
+}
+
+func checkResponse(r *http.Response) error {
+	if c := r.StatusCode; 200 <= c && c <= 299 {
+		return nil
+	}
+	errorResponse := &ErrorResponse{Response: r}
+	data, err := ioutil.ReadAll(r.Body)
+	if err == nil && data != nil {
+		json.Unmarshal(data, errorResponse)
+	}
+	errorResponse.Message = r.Status
+	errorResponse.StatusCode = r.StatusCode
+
+	return errorResponse
+}
+
+// newResponse creates a new Response for the provided http.Response.
+func newResponse(r *http.Response) *Response {
+	response := &Response{Response: r}
+	response.StatusMessage = r.Status
+	response.StatusCode = r.StatusCode
+	return response
 }
 
 func NewClient(httpClient *http.Client, serverURL string) (*Client, error) {
@@ -84,33 +111,6 @@ func (c *Client) newRequest(method, urlString string, body interface{}) (*http.R
 	return req, nil
 }
 
-func checkResponse(r *http.Response) error {
-	if c := r.StatusCode; 200 <= c && c <= 299 {
-		return nil
-	}
-	errorResponse := &ErrorResponse{Response: r}
-	data, err := ioutil.ReadAll(r.Body)
-	if err == nil && data != nil {
-		json.Unmarshal(data, errorResponse)
-	}
-
-	return errorResponse
-}
-
-type Response struct {
-	*http.Response
-	StatusCode    int
-	StatusMessage string
-}
-
-// newResponse creates a new Response for the provided http.Response.
-func newResponse(r *http.Response) *Response {
-	response := &Response{Response: r}
-	response.StatusMessage = r.Status
-	response.StatusCode = r.StatusCode
-	return response
-}
-
 func (c *Client) do(req *http.Request, v interface{}) (*Response, error) {
 
 	resp, err := c.client.Do(req)
@@ -149,6 +149,10 @@ func (c *Client) do(req *http.Request, v interface{}) (*Response, error) {
 	return response, err
 }
 
+// Creates a new event
+//
+// If an empty eventId is provided an eventId will be generated
+// and retured in the event.
 func (c *Client) NewEvent(eventId, eventType string, data interface{}) *Event {
 
 	e := &Event{EventType: eventType}
@@ -164,6 +168,13 @@ func (c *Client) NewEvent(eventId, eventType string, data interface{}) *Event {
 	return e
 }
 
+// Writes an event to the head of the stream
+//
+// There are some special version numbers that can be provided.
+// http://docs.geteventstore.com/http-api/3.5.0/writing-to-a-stream/
+// -2 : The write should never conflict with anything and should always succeed
+// -1 : The stream should not exist at the time of writing. This write will create it.
+//  0 : The stream should exist but it should be empty
 func (c *Client) AppendToStream(streamName string, expectedVersion *StreamVersion, events ...*Event) (*Response, error) {
 
 	u := fmt.Sprintf("/streams/%s", streamName)

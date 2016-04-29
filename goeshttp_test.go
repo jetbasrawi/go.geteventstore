@@ -182,6 +182,36 @@ func TestDo(t *testing.T) {
 
 }
 
+func TestErrorResponse(t *testing.T) {
+	setup()
+	defer teardown()
+
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+
+		fmt.Fprintf(w, "Response Body")
+
+	})
+
+	req, _ := client.newRequest("POST", "/", nil)
+
+	_, err := client.do(req, nil)
+
+	if e, ok := err.(*ErrorResponse); ok {
+		if e.StatusCode != http.StatusBadRequest {
+			t.Errorf("Got %d Want %d", e.StatusCode, http.StatusBadRequest)
+		}
+
+		want := "400 Bad Request"
+		if e.Message != want {
+			t.Errorf("Got %s, Want %s", e.Message, want)
+		}
+	} else {
+		t.Errorf("Expected error should be type *ErrorResponse")
+	}
+
+}
+
 func TestNewResponse(t *testing.T) {
 
 	r := http.Response{
