@@ -176,6 +176,26 @@ func TestDo(t *testing.T) {
 
 }
 
+func TestErrorResponseContainsCopyOfTheOriginalRequest(t *testing.T) {
+	setup()
+	defer teardown()
+
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(w, "")
+	})
+
+	req, _ := client.newRequest("POST", "/", "[{\"some_field\": 34534}]")
+
+	_, err := client.do(req, nil)
+
+	if e, ok := err.(*ErrorResponse); ok {
+		if !reflect.DeepEqual(e.Request, req) {
+			t.Errorf("Got\n %#v\n Want\n %#v\n", e.Request, req)
+		}
+	}
+}
+
 func TestErrorResponseContainsStatusCodeAndMessage(t *testing.T) {
 	setup()
 	defer teardown()

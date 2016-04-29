@@ -64,6 +64,7 @@ type Response struct {
 // StatusCode contains the status code returned from the server.
 type ErrorResponse struct {
 	Response   *http.Response // HTTP response that caused this error
+	Request    *http.Request
 	Message    string
 	StatusCode int
 }
@@ -74,7 +75,7 @@ func (r *ErrorResponse) Error() string {
 		r.Response.StatusCode, r.Message)
 }
 
-func checkResponse(r *http.Response) error {
+func checkResponse(r *http.Response, req *http.Request) error {
 	if c := r.StatusCode; 200 <= c && c <= 299 {
 		return nil
 	}
@@ -85,6 +86,7 @@ func checkResponse(r *http.Response) error {
 	}
 	errorResponse.Message = r.Status
 	errorResponse.StatusCode = r.StatusCode
+	errorResponse.Request = req
 
 	return errorResponse
 }
@@ -129,6 +131,15 @@ func (c *Client) newRequest(method, urlString string, body interface{}) (*http.R
 
 func (c *Client) do(req *http.Request, v io.Writer) (*Response, error) {
 
+	var keep, send io.ReadCloser
+
+	if req.Body != nil {
+		if buf, err := ioutil.ReadAll(req.Body); err == nil {
+			keep = ioutil.NopCloser(bytes.NewReader(buf))
+			send = ioutil.NopCloser(bytes.NewReader(buf))
+			req.Body = send
+		}
+	}
 	resp, err := c.client.Do(req)
 	if err != nil {
 		return nil, err
@@ -138,14 +149,21 @@ func (c *Client) do(req *http.Request, v io.Writer) (*Response, error) {
 
 	response := newResponse(resp)
 
-	err = checkResponse(resp)
+	if keep != nil {
+		req.Body = keep
+	}
+	err = checkResponse(resp, req)
 	if err != nil {
+
 		// even though there was an error, we still return the response
 		// in case the caller wants to inspect it further
 		return response, err
 	}
 
-	io.Copy(v, resp.Body)
+	// When handling post requests v will be nil
+	if v != nil {
+		io.Copy(v, resp.Body)
+	}
 
 	return response, err
 }
