@@ -1,3 +1,4 @@
+// The simhandler simulates the EventStore ATOM feeds for streams.
 package goes
 
 import (

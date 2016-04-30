@@ -141,20 +141,6 @@ func TestGetSliceSectionBackwardUnder(t *testing.T) {
 
 }
 
-//Testing the case where the version is less than zero
-//this should not occur in general operation
-//func TestGetSliceSectionBackwardOut(t *testing.T) {
-//es := createTestEvents(100, "x", "x", "x")
-
-//s, isF, isL := getSliceSection(es, &StreamVersion{Number: -1}, 50, "backward")
-//if len(s) != 0 {
-//t.Errorf("Got: %d Want: %d", len(s), 0)
-//}
-//if isF || !isL {
-//t.Errorf("isF: %t isL: %t", isF, isL)
-//}
-//}
-
 //Testing the case where the version may be over the
 //size of the highest version. This will happen when
 //polling the head of the stream waiting for changes
@@ -595,23 +581,6 @@ func TestCreateFeedEntriesLast(t *testing.T) {
 	}
 }
 
-/*func TestCreateFeedEntriesOver(t *testing.T) {*/
-//setup()
-//defer teardown()
-
-//stream := "astream"
-//url := fmt.Sprintf("%s/streams/%s/100/forward/20", server.URL, stream)
-
-//es := createTestEvents(100, stream, server.URL, "EventTypeX")
-//m, err := createTestFeed(es, url)
-//if err != nil {
-//t.Errorf("Enexpected Error %s", err)
-//}
-//if len(m.Entry) != 0 {
-//t.Errorf("Got %d Want %d", len(m.Entry), 20)
-//}
-//}
-
 func TestCreateFeedEntries(t *testing.T) {
 	setup()
 	defer teardown()
@@ -635,25 +604,6 @@ func TestCreateFeedEntries(t *testing.T) {
 	}
 }
 
-//func TestCreateFeedEntriesUnderOutOfRange(t *testing.T) {
-//setup()
-//defer teardown()
-
-//stream := "astream"
-//url := fmt.Sprintf("%s/streams/%s/-1/forward/20", server.URL, stream)
-
-//es := createTestEvents(100, stream, server.URL, "EventTypeX")
-//m, err := createTestFeed(es, url)
-
-//if m != nil {
-//t.Error("Got: %+v, Want: %+v", m, nil)
-//}
-
-//if err == nil {
-//t.Error("Expected invalid version number error")
-//}
-
-//}
 func TestCreateFeedEntriesTail(t *testing.T) {
 	setup()
 	defer teardown()

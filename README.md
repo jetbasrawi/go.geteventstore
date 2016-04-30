@@ -1,5 +1,12 @@
 #GOES
 
-A Go HTTP Client for EventStore 
+A Go HTTP Client for EventStore (https://geteventstore.com)
 
-WIP
+Status: This client is currently in development.
+
+Currently Supported:
+
+- Reading Streams forward
+- Reading Streams Backward
+- Appendind Events
+- Getting Events
