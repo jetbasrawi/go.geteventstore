@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"strconv"
 	"strings"
 
@@ -31,7 +30,17 @@ type Take struct {
 	Number int
 }
 
+// TODO: Improve this descroption. Check if this sis stream or event metadata.
+// MetaData encapsulates the MetaData
+type MetaData struct {
+	EventType string      `json:"eventType"`
+	EventID   string      `json:"eventId"`
+	Data      interface{} `json:"data"`
+}
+
 // AppendToStream writes an event to the head of the stream
+//
+// If the stream does not exist, it will be created.
 //
 // There are some special version numbers that can be provided.
 // http://docs.geteventstore.com/http-api/3.6.0/writing-to-a-stream/
@@ -67,13 +76,14 @@ func (c *Client) AppendToStream(streamName string, expectedVersion *StreamVersio
 //
 // For more information on stream metadata see:
 // http://docs.geteventstore.com/http-api/3.6.0/stream-metadata/
-func (c *Client) UpdateMetaData(stream string, metadata ...*MetaData) (*Response, error) {
+func (c *Client) UpdateStreamMetaData(stream string, metadata interface{}) (*Response, error) {
 
+	m := c.NewEvent("", "MetaData", metadata, nil)
 	mURL, resp, err := c.getMetadataURL(stream)
 	if err != nil {
 		return resp, err
 	}
-	req, err := c.newRequest("POST", mURL, metadata)
+	req, err := c.newRequest("POST", mURL, m)
 	if err != nil {
 		return resp, err
 	}
@@ -220,7 +230,6 @@ func (c *Client) ReadFeedBackward(stream string, version *StreamVersion, take *T
 
 		u, err := getEventURLs(f)
 		if err != nil {
-			log.Printf("Error getting event URLs %#v\n", err)
 			return nil, nil, err
 		}
 		if len(u) <= 0 {
@@ -248,7 +257,6 @@ func (c *Client) ReadFeedBackward(stream string, version *StreamVersion, take *T
 
 	e, resp, err := c.GetEvents(urls)
 	if err != nil {
-		log.Printf("Error getting events %#v\n", err)
 		return nil, resp, err
 	}
 

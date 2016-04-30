@@ -99,9 +99,7 @@ func TestReadFeedBackwardError(t *testing.T) {
 	stream := "ABigStream"
 	errWant := errors.New("Stream Does Not Exist")
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-
 		http.Error(w, errWant.Error(), http.StatusNotFound)
-
 	})
 
 	_, resp, err := client.ReadFeedBackward(stream, nil, nil)
@@ -151,9 +149,7 @@ func TestReadFeedBackwardFromVersionAll(t *testing.T) {
 		if v.Event.EventNumber != ex {
 			t.Errorf("Got %d Want %d", v.Event.EventNumber, ex)
 		}
-		//fmt.Printf("%d\n %s", k, v.PrettyPrint())
 	}
-
 }
 
 func TestReadFeedBackwardAll(t *testing.T) {
@@ -189,9 +185,7 @@ func TestReadFeedBackwardAll(t *testing.T) {
 		if v.Event.EventNumber != ex {
 			t.Errorf("Got %d Want %d", v.Event.EventNumber, ex)
 		}
-		//fmt.Printf("%d\n %s", k, v.PrettyPrint())
 	}
-
 }
 
 func TestReadFeedForwardError(t *testing.T) {
@@ -201,9 +195,7 @@ func TestReadFeedForwardError(t *testing.T) {
 	stream := "ABigStream"
 	errWant := errors.New("Stream Does Not Exist")
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-
 		http.Error(w, errWant.Error(), http.StatusNotFound)
-
 	})
 
 	_, resp, err := client.ReadFeedForward(stream, nil, nil)
@@ -215,6 +207,7 @@ func TestReadFeedForwardError(t *testing.T) {
 		t.Errorf("Got %v Want %v", resp.StatusCode, http.StatusNotFound)
 	}
 }
+
 func TestReadFeedBackwardFromVersionWithTake(t *testing.T) {
 	setup()
 	defer teardown()
@@ -254,9 +247,7 @@ func TestReadFeedBackwardFromVersionWithTake(t *testing.T) {
 		if v.Event.EventNumber != ex {
 			t.Errorf("Got %d Want %d", v.Event.EventNumber, ex)
 		}
-		//fmt.Printf("%d\n %s", k, v.PrettyPrint())
 	}
-
 }
 
 func TestReadFeedBackwardFromVersionWithTakeOutOfRangeUnder(t *testing.T) {
@@ -298,9 +289,7 @@ func TestReadFeedBackwardFromVersionWithTakeOutOfRangeUnder(t *testing.T) {
 		if v.Event.EventNumber != ex {
 			t.Errorf("Got %d Want %d", v.Event.EventNumber, ex)
 		}
-		//fmt.Printf("%d\n %s", k, v.PrettyPrint())
 	}
-
 }
 
 //Try to get versions past head of stream that do not yet exist
@@ -327,7 +316,6 @@ func TestReadFeedForwardTail(t *testing.T) {
 	if len(evs) != nex {
 		t.Errorf("Got: %d Want: %d", len(evs), nex)
 	}
-
 }
 
 func TestGetFeedURLInvalidVersion(t *testing.T) {
@@ -383,9 +371,7 @@ func TestReadFeedForwardAll(t *testing.T) {
 		if v.Event.EventNumber != ex {
 			t.Errorf("Got %d Want %d", v.Event.EventNumber, ex)
 		}
-		//fmt.Printf("%d\n", v.EventNumber)
 	}
-
 }
 
 func TestGetFeedURLForwardLowTake(t *testing.T) {
@@ -411,6 +397,7 @@ func TestGetFeedURLInvalidDirection(t *testing.T) {
 		t.Errorf("Got %s Want %s", got, want)
 	}
 }
+
 func TestGetFeedURLBackwardNilAll(t *testing.T) {
 	want := "/streams/some-stream/head/backward/100"
 	got, _ := getFeedURL("some-stream", "", nil, nil)
@@ -472,56 +459,57 @@ func TestGetMetaData(t *testing.T) {
 	m := createTestEvent(stream, server.URL, "metadata", 10, &raw, nil)
 	want, _ := createTestEventResponse(m, nil)
 
-	//fmt.Printf("M: %+v", m)
-
 	setupSimulator(es, m)
 
 	got, _, _ := client.GetStreamMetaData(stream)
 	if !reflect.DeepEqual(got.PrettyPrint(), want.PrettyPrint()) {
 		t.Errorf("Got: %s\n Want %s\n ", got.PrettyPrint(), want.PrettyPrint())
 	}
-	//fmt.Printf("Got: %s\n", got.PrettyPrint())
-	//fmt.Printf("Want: %s\n", want.PrettyPrint())
-
 }
 
-func TestAppendEventMetadata(t *testing.T) {
+func TestAppendStreamMetadata(t *testing.T) {
 
 	setup()
 	defer teardown()
 
-	et := "SomeEventType"
+	eventType := "MetaData"
 	stream := "Some-Stream"
 
+	// Before updating the metadata, the method needs to get the MetaData url
+	// According to the docs, the eventstore team reserve the right to change
+	// the metadata url.
 	fURL := fmt.Sprintf("/streams/%s/head/backward/100", stream)
 	fullURL := fmt.Sprintf("%s%s", server.URL, fURL)
 	mux.HandleFunc(fURL, func(w http.ResponseWriter, r *http.Request) {
-		es := createTestEvents(1, stream, server.URL, et)
+		es := createTestEvents(1, stream, server.URL, eventType)
 		f, _ := createTestFeed(es, fullURL)
 		fmt.Fprint(w, f.PrettyPrint())
 	})
 
-	ml := fmt.Sprintf("{\"baz\": \"boo\"}")
-	m := json.RawMessage(ml)
-	evID, _ := NewUUID()
-	meta := &MetaData{EventID: evID, EventType: et, Data: &m}
+	meta := fmt.Sprintf("{\"baz\":\"boo\"}")
+	want := json.RawMessage(meta)
 
 	url := fmt.Sprintf("/streams/%s/metadata", stream)
 
 	mux.HandleFunc(url, func(w http.ResponseWriter, r *http.Request) {
 		testMethod(t, r, "POST")
 
-		var mg json.RawMessage
-		g := MetaData{Data: &mg}
-		_ = json.NewDecoder(r.Body).Decode(&g)
-		i, _ := json.MarshalIndent(g, "", "	")
-		fmt.Println(i)
+		var got json.RawMessage
+		ev := &Event{Data: &got}
+		err := json.NewDecoder(r.Body).Decode(ev)
+		if err != nil {
+			t.Errorf("Unexpected error %#v", err)
+		}
+
+		if !reflect.DeepEqual(string(got), string(want)) {
+			t.Errorf("Got\n %#v\n Want\n %#v\n", string(got), string(want))
+		}
 
 		w.WriteHeader(http.StatusCreated)
 		fmt.Fprint(w, "")
 	})
 
-	resp, err := client.UpdateMetaData(stream, meta)
+	resp, err := client.UpdateStreamMetaData(stream, &want)
 	if err != nil {
 		t.Errorf("UpdateMetadata returned error: %v", err)
 	}

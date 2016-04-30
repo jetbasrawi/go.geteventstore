@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	//"math/rand"
+	"math/rand"
 	"net/http"
 	"reflect"
 	"strconv"
@@ -18,13 +18,20 @@ type MyDataType struct {
 	Field2 string `json:"my_field_2"`
 }
 
+type MyMetaDataType struct {
+	MetaField1 int    `json:"my_meta_field_1"`
+	MetaField2 string `json:"my_meta_field_2"`
+}
+
 func TestNewEvent(t *testing.T) {
 	uuid, _ := NewUUID()
 	eventType := "MyEventType"
 	data := &MyDataType{Field1: 555, Field2: "Some string"}
-	want := &Event{EventID: uuid, EventType: eventType, Data: data}
+	meta := &MyMetaDataType{MetaField1: 1010, MetaField2: "Some meta string"}
 
-	got := client.NewEvent(uuid, eventType, data)
+	want := &Event{EventID: uuid, EventType: eventType, Data: data, MetaData: meta}
+
+	got := client.NewEvent(uuid, eventType, data, meta)
 
 	if !reflect.DeepEqual(got, want) {
 		t.Error("Error creating event. Got %+v, Want %+v", got, want)
@@ -39,7 +46,7 @@ func TestAppendEventsSingle(t *testing.T) {
 	data := &MyDataType{Field1: 445, Field2: "Some string"}
 	et := "SomeEventType"
 
-	ev := client.NewEvent("", et, data)
+	ev := client.NewEvent("", et, data, nil)
 
 	stream := "Some-Stream"
 
@@ -93,8 +100,8 @@ func TestAppendEventsMultiple(t *testing.T) {
 	et := "SomeEventType"
 	d1 := &MyDataType{Field1: 445, Field2: "Some string"}
 	d2 := &MyDataType{Field1: 446, Field2: "Some other string"}
-	ev1 := client.NewEvent("", et, d1)
-	ev2 := client.NewEvent("", et, d2)
+	ev1 := client.NewEvent("", et, d1, nil)
+	ev2 := client.NewEvent("", et, d2, nil)
 
 	stream := "Some-Stream"
 	url := fmt.Sprintf("/streams/%s", stream)
@@ -151,7 +158,7 @@ func TestAppendEventsWithExpectedVersion(t *testing.T) {
 
 	data := &MyDataType{Field1: 445, Field2: "Some string"}
 	et := "SomeEventType"
-	ev := client.NewEvent("", et, data)
+	ev := client.NewEvent("", et, data, nil)
 
 	stream := "Some-Stream"
 	url := fmt.Sprintf("/streams/%s", stream)
@@ -239,4 +246,57 @@ func TestGetEventURLs(t *testing.T) {
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Got:\n %+v\n Want:\n %+v\n", got, want)
 	}
+}
+
+func createTestEvent(stream, server, eventType string, eventNumber int, data *json.RawMessage, meta *json.RawMessage) *Event {
+
+	e := Event{}
+	e.EventStreamID = stream
+	e.EventNumber = eventNumber
+	e.EventType = eventType
+
+	uuid, _ := NewUUID()
+	e.EventID = uuid
+
+	e.Data = data
+
+	u := fmt.Sprintf("%s/streams/%s", server, stream)
+	eu := fmt.Sprintf("%s/%d/", u, eventNumber)
+	l1 := Link{URI: eu, Relation: "edit"}
+	l2 := Link{URI: eu, Relation: "alternate"}
+	ls := []Link{l1, l2}
+	e.Links = ls
+
+	if meta != nil {
+		e.MetaData = meta
+	} else {
+		m := "\"\""
+		mraw := json.RawMessage(m)
+		e.MetaData = &mraw
+	}
+	return &e
+
+}
+
+func createTestEvents(numEvents int, stream string, server string, eventTypes ...string) []*Event {
+
+	se := []*Event{}
+
+	for i := 0; i < numEvents; i++ {
+		r := rand.Intn(len(eventTypes))
+		eventType := eventTypes[r]
+
+		d := fmt.Sprintf("{ \"foo\" : %d }", rand.Intn(9999))
+		raw := json.RawMessage(d)
+
+		uuid, _ := NewUUID()
+		m := fmt.Sprintf("{\"bar\": \"%s\"}", uuid)
+		mraw := json.RawMessage(m)
+
+		e := createTestEvent(stream, server, eventType, i, &raw, &mraw)
+
+		se = append(se, e)
+
+	}
+	return se
 }

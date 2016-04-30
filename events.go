@@ -9,7 +9,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
-	"log"
 	"time"
 )
 
@@ -32,8 +31,7 @@ func (e *EventResponse) PrettyPrint() string {
 
 	b, err := json.MarshalIndent(e, "", "	")
 	if err != nil {
-		log.Println(err)
-		//panic(err)
+		panic(err)
 	}
 	return string(b)
 
@@ -53,8 +51,7 @@ func (e *eventAtomResponse) PrettyPrint() string {
 
 	b, err := json.MarshalIndent(e, "", "	")
 	if err != nil {
-		log.Println(err)
-		//panic(err)
+		panic(err)
 	}
 	return string(b)
 
@@ -87,14 +84,6 @@ func (e *Event) PrettyPrint() string {
 	return string(b)
 }
 
-// TODO: Improve this descroption. Check if this sis stream or event metadata.
-// MetaData encapsulates the MetaData
-type MetaData struct {
-	EventType string      `json:"eventType"`
-	EventID   string      `json:"eventId"`
-	Data      interface{} `json:"data"`
-}
-
 // Link encapsulates url data for events.
 type Link struct {
 	URI      string `json:"uri"`
@@ -112,7 +101,7 @@ func Time(t time.Time) TimeStr {
 //
 // If an empty eventId is provided an eventId will be generated
 // and retured in the event.
-func (c *Client) NewEvent(eventId, eventType string, data interface{}) *Event {
+func (c *Client) NewEvent(eventId, eventType string, data interface{}, meta interface{}) *Event {
 
 	e := &Event{EventType: eventType}
 
@@ -124,10 +113,19 @@ func (c *Client) NewEvent(eventId, eventType string, data interface{}) *Event {
 
 	e.Data = data
 
+	e.MetaData = meta
+
 	return e
 }
 
 // GetEvents gets all the events specified in the urls argument.
+//
+// The event slice will be nil in an error case.
+// *Response may be nil if an error occurs before the http request. Otherwise
+// it will contain the raw http response and status.
+// If an error occurs during the http request an *ErrorResponse will be returned
+// as the error. The *ErrorResponse will contain the raw http response and status
+// and a description of the error.
 func (c *Client) GetEvents(urls []string) ([]*EventResponse, *Response, error) {
 
 	s := make([]*EventResponse, len(urls))
@@ -137,7 +135,6 @@ func (c *Client) GetEvents(urls []string) ([]*EventResponse, *Response, error) {
 		if err != nil {
 			return nil, resp, err
 		}
-		//fmt.Printf("EVENT: %+v\n", e)
 		s[i] = e
 	}
 	return s, nil, nil
@@ -163,7 +160,6 @@ func (c *Client) GetEvent(url string) (*EventResponse, *Response, error) {
 	var b bytes.Buffer
 	resp, err := c.do(r, &b)
 	if err != nil {
-		log.Println("Error processing request")
 		return nil, resp, err
 	}
 
@@ -178,7 +174,6 @@ func (c *Client) GetEvent(url string) (*EventResponse, *Response, error) {
 	}
 
 	if err != nil {
-		log.Printf("unmarshallEventResponse Error: %s", err)
 		return nil, resp, err
 	}
 
@@ -188,11 +183,10 @@ func (c *Client) GetEvent(url string) (*EventResponse, *Response, error) {
 
 	err = json.Unmarshal(raw, ev)
 	if err == io.EOF {
-		log.Println(err)
 		err = nil
 	}
 	if err != nil {
-		log.Printf("GetEvent: %#v\n", err)
+		return nil, resp, err
 	}
 
 	e := EventResponse{}
