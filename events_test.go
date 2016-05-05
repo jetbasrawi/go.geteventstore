@@ -31,7 +31,7 @@ func TestNewEvent(t *testing.T) {
 
 	want := &Event{EventID: uuid, EventType: eventType, Data: data, MetaData: meta}
 
-	got := client.NewEvent(uuid, eventType, data, meta)
+	got := client.ToEventData(uuid, eventType, data, meta)
 
 	if !reflect.DeepEqual(got, want) {
 		t.Error("Error creating event. Got %+v, Want %+v", got, want)
@@ -46,7 +46,7 @@ func TestAppendEventsSingle(t *testing.T) {
 	data := &MyDataType{Field1: 445, Field2: "Some string"}
 	et := "SomeEventType"
 
-	ev := client.NewEvent("", et, data, nil)
+	ev := client.ToEventData("", et, data, nil)
 
 	stream := "Some-Stream"
 
@@ -100,8 +100,8 @@ func TestAppendEventsMultiple(t *testing.T) {
 	et := "SomeEventType"
 	d1 := &MyDataType{Field1: 445, Field2: "Some string"}
 	d2 := &MyDataType{Field1: 446, Field2: "Some other string"}
-	ev1 := client.NewEvent("", et, d1, nil)
-	ev2 := client.NewEvent("", et, d2, nil)
+	ev1 := client.ToEventData("", et, d1, nil)
+	ev2 := client.ToEventData("", et, d2, nil)
 
 	stream := "Some-Stream"
 	url := fmt.Sprintf("/streams/%s", stream)
@@ -158,7 +158,7 @@ func TestAppendEventsWithExpectedVersion(t *testing.T) {
 
 	data := &MyDataType{Field1: 445, Field2: "Some string"}
 	et := "SomeEventType"
-	ev := client.NewEvent("", et, data, nil)
+	ev := client.ToEventData("", et, data, nil)
 
 	stream := "Some-Stream"
 	url := fmt.Sprintf("/streams/%s", stream)

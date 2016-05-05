@@ -523,3 +523,16 @@ func TestAppendStreamMetadata(t *testing.T) {
 	}
 
 }
+
+//func TestAppendWithMetaDataMap(t *testing.T) {
+
+////stream := "some-stream"
+//data := &MyDataType{5, "Some Data"}
+//meta := make(map[string]interface{})
+//meta["first"] = "Some string"
+//meta["second"] = 9
+//meta["third"] = data
+//ev := client.ToEventData("", "EventType", data, meta)
+
+//fmt.Println(ev.PrettyPrint())
+//}
