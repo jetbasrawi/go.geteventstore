@@ -119,7 +119,7 @@ func (c *Client) GetStreamMetaData(stream string) (*EventResponse, *Response, er
 	return er, resp, nil
 }
 
-// ReadFeedForward gets all events in the stream starting at the version specified
+// ReadStreamForward gets all events in the stream starting at the version specified
 // up to the end of the stream or up to the number of events specified by the take
 // argument.
 //
@@ -136,7 +136,7 @@ func (c *Client) GetStreamMetaData(stream string) (*EventResponse, *Response, er
 // will be returned and will contain the raw http response and status.
 // An *ErrorResponse will also be returned and this will contain the raw http
 // response and status and a description of the error.
-func (c *Client) ReadFeedForward(stream string, version *StreamVersion, take *Take) ([]*EventResponse, *Response, error) {
+func (c *Client) ReadStreamForward(stream string, version *StreamVersion, take *Take) ([]*EventResponse, *Response, error) {
 
 	url, err := getFeedURL(stream, "forward", version, take)
 	if err != nil {
@@ -146,7 +146,7 @@ func (c *Client) ReadFeedForward(stream string, version *StreamVersion, take *Ta
 	urls := []string{}
 
 	for {
-		f, resp, err := c.readFeed(url)
+		f, resp, err := c.readStream(url)
 		if err != nil {
 			return nil, resp, err
 		}
@@ -195,11 +195,11 @@ func (c *Client) ReadFeedForward(stream string, version *StreamVersion, take *Ta
 	return e, nil, nil
 }
 
-// ReadFeedBackward gets all events in the stream starting at the version specified
+// ReadStreamBackward gets all events in the stream starting at the version specified
 // up to version 0  of the stream or up to the number of events specified by the take
 // argument.
 //
-// If version argument is nil, reading will begin the end of the stream.
+// If version argument is nil, reading will begin at the head of the stream.
 // If take is nil, all events from the version number to the first event of the stream
 // will be returned.
 //
@@ -212,7 +212,7 @@ func (c *Client) ReadFeedForward(stream string, version *StreamVersion, take *Ta
 // will be returned and will contain the raw http response and status.
 // An *ErrorResponse will also be returned and this will contain the raw http
 // response and status and a description of the error.
-func (c *Client) ReadFeedBackward(stream string, version *StreamVersion, take *Take) ([]*EventResponse, *Response, error) {
+func (c *Client) ReadStreamBackward(stream string, version *StreamVersion, take *Take) ([]*EventResponse, *Response, error) {
 
 	url, err := getFeedURL(stream, "backward", version, take)
 	if err != nil {
@@ -222,7 +222,7 @@ func (c *Client) ReadFeedBackward(stream string, version *StreamVersion, take *T
 	urls := []string{}
 	for {
 
-		f, resp, err := c.readFeed(url)
+		f, resp, err := c.readStream(url)
 		if err != nil {
 			return nil, resp, err
 		}
@@ -270,7 +270,7 @@ func (c *Client) ReadFeedBackward(stream string, version *StreamVersion, take *T
 	return e, nil, nil
 }
 
-// readFeed is a reads a stream atom feed page specified by the url.
+// readStream is a reads a stream atom feed page specified by the url.
 // returns a *atom.Feed object
 //
 // The feed object returned may be nil in case of an error.
@@ -279,7 +279,7 @@ func (c *Client) ReadFeedBackward(stream string, version *StreamVersion, take *T
 // raw http response and status.
 // If the error occured during the http request an *ErrorResponse will be returned
 // and this will also contain the raw http request and status and an error message.
-func (c *Client) readFeed(url string) (*atom.Feed, *Response, error) {
+func (c *Client) readStream(url string) (*atom.Feed, *Response, error) {
 
 	req, err := c.newRequest("GET", url, nil)
 	if err != nil {
@@ -310,7 +310,7 @@ func (c *Client) getMetadataURL(stream string) (string, *Response, error) {
 		return "", nil, err
 	}
 
-	f, resp, err := c.readFeed(url)
+	f, resp, err := c.readStream(url)
 	if err != nil {
 		return "", resp, err
 	}
@@ -385,5 +385,4 @@ func getFeedURL(stream, direction string, version *StreamVersion, take *Take) (s
 	}
 
 	return fmt.Sprintf("/streams/%s/%s/%s/%d", stream, ver, dir, ps), nil
-
 }

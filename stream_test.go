@@ -70,7 +70,7 @@ func (s *StreamSuite) TestRunServer(c *C) {
 
 	setupSimulator(es, nil)
 
-	_, _, err := client.ReadFeedBackward(stream, nil, nil)
+	_, _, err := client.ReadStreamBackward(stream, nil, nil)
 	c.Assert(err, IsNil)
 }
 
@@ -81,7 +81,7 @@ func (s *StreamSuite) TestReadFeedBackwardError(c *C) {
 		http.Error(w, errWant.Error(), http.StatusNotFound)
 	})
 
-	_, resp, err := client.ReadFeedBackward(stream, nil, nil)
+	_, resp, err := client.ReadStreamBackward(stream, nil, nil)
 	c.Assert(err, NotNil)
 	c.Assert(resp.StatusCode, Equals, http.StatusNotFound)
 }
@@ -95,7 +95,7 @@ func (s *StreamSuite) TestReadFeedBackwardFromVersionAll(c *C) {
 
 	ver := &StreamVersion{Number: 100}
 
-	evs, _, err := client.ReadFeedBackward(stream, ver, nil)
+	evs, _, err := client.ReadStreamBackward(stream, ver, nil)
 	c.Assert(err, IsNil)
 	nex := ver.Number + 1
 	c.Assert(evs, HasLen, nex)
@@ -114,7 +114,7 @@ func (s *StreamSuite) TestReadFeedBackwardAll(c *C) {
 
 	setupSimulator(es, nil)
 
-	evs, _, err := client.ReadFeedBackward(stream, nil, nil)
+	evs, _, err := client.ReadStreamBackward(stream, nil, nil)
 	c.Assert(err, IsNil)
 	c.Assert(evs, HasLen, ne)
 	c.Assert(evs[0].Event.EventNumber, Equals, ne-1)
@@ -132,7 +132,7 @@ func (s *StreamSuite) TestReadFeedForwardError(c *C) {
 		http.Error(w, errWant.Error(), http.StatusNotFound)
 	})
 
-	_, resp, err := client.ReadFeedForward(stream, nil, nil)
+	_, resp, err := client.ReadStreamForward(stream, nil, nil)
 	c.Assert(err, NotNil)
 	c.Assert(resp.StatusCode, Equals, http.StatusNotFound)
 }
@@ -147,7 +147,7 @@ func (s *StreamSuite) TestReadFeedBackwardFromVersionWithTake(c *C) {
 	ver := &StreamVersion{Number: 667}
 	take := &Take{Number: 14}
 
-	evs, _, err := client.ReadFeedBackward(stream, ver, take)
+	evs, _, err := client.ReadStreamBackward(stream, ver, take)
 	c.Assert(err, IsNil)
 	nex := take.Number
 	c.Assert(evs, HasLen, nex)
@@ -171,7 +171,7 @@ func (s *StreamSuite) TestReadFeedBackwardFromVersionWithTakeOutOfRangeUnder(c *
 	ver := &StreamVersion{Number: 49}
 	take := &Take{Number: 59}
 
-	evs, _, err := client.ReadFeedBackward(stream, ver, take)
+	evs, _, err := client.ReadStreamBackward(stream, ver, take)
 	c.Assert(err, IsNil)
 
 	nex := ver.Number + 1
@@ -195,7 +195,7 @@ func (s *StreamSuite) TestReadFeedForwardTail(c *C) {
 	setupSimulator(es, nil)
 	ver := &StreamVersion{Number: 1000}
 
-	evs, _, err := client.ReadFeedForward(stream, ver, nil)
+	evs, _, err := client.ReadStreamForward(stream, ver, nil)
 
 	c.Assert(err, IsNil)
 	c.Assert(evs, HasLen, 0)
@@ -216,7 +216,7 @@ func (s *StreamSuite) TestReadFeedForwardAll(c *C) {
 
 	setupSimulator(es, nil)
 
-	evs, _, err := client.ReadFeedForward(stream, nil, nil)
+	evs, _, err := client.ReadStreamForward(stream, nil, nil)
 	c.Assert(err, IsNil)
 	c.Assert(evs, HasLen, ne)
 	c.Assert(evs[0].Event.EventNumber, Equals, 0)

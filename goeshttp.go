@@ -15,6 +15,32 @@ import (
 	"net/url"
 )
 
+type StreamAppender interface {
+	AppendToStream(string, *StreamVersion, ...*Event) (*Response, error)
+}
+
+type MetaDataUpdater interface {
+	UpdateStreamMetaData(string, interface{}) (*Response, error)
+}
+
+type MetaDataReader interface {
+	GetStreamMetaData(string) (*EventResponse, *Response, error)
+}
+
+type StreamReader interface {
+	ReadStreamForward(string, *StreamVersion, *Take) ([]*EventResponse, *Response, error)
+	ReadStreamBackward(string, *StreamVersion, *Take) ([]*EventResponse, *Response, error)
+}
+
+type EventBuilder interface {
+	ToEventData(string, string, interface{}, interface{})
+}
+
+type EventReader interface {
+	GetEvent(string) (*EventResponse, *Response, error)
+	GetEvents([]string) ([]*EventResponse, *Response, error)
+}
+
 // client is the object used to interact with the eventstore.
 //
 // Use the NewClient constructor to get a client.
