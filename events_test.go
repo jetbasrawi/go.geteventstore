@@ -1,3 +1,8 @@
+// Copyright 2016 Jet Basrawi. All rights reserved.
+//
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 package goes
 
 import (
@@ -7,11 +12,22 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"net/http"
-	"reflect"
 	"strconv"
-	"testing"
 	"time"
+
+	. "gopkg.in/check.v1"
 )
+
+var _ = Suite(&EventSuite{})
+
+type EventSuite struct{}
+
+func (s *EventSuite) SetUpTest(c *C) {
+	setup()
+}
+func (s *EventSuite) TearDownTest(c *C) {
+	teardown()
+}
 
 type MyDataType struct {
 	Field1 int    `json:"my_field_1"`
@@ -23,79 +39,49 @@ type MyMetaDataType struct {
 	MetaField2 string `json:"my_meta_field_2"`
 }
 
-func TestNewEvent(t *testing.T) {
+func (s *EventSuite) TestNewEvent(c *C) {
 	uuid, _ := NewUUID()
 	eventType := "MyEventType"
 	data := &MyDataType{Field1: 555, Field2: "Some string"}
 	meta := &MyMetaDataType{MetaField1: 1010, MetaField2: "Some meta string"}
-
 	want := &Event{EventID: uuid, EventType: eventType, Data: data, MetaData: meta}
 
 	got := client.ToEventData(uuid, eventType, data, meta)
 
-	if !reflect.DeepEqual(got, want) {
-		t.Error("Error creating event. Got %+v, Want %+v", got, want)
-	}
+	c.Assert(got, DeepEquals, want)
 }
 
-func TestAppendEventsSingle(t *testing.T) {
-
-	setup()
-	defer teardown()
-
+func (s *EventSuite) TestAppendEventsSingle(c *C) {
 	data := &MyDataType{Field1: 445, Field2: "Some string"}
 	et := "SomeEventType"
-
 	ev := client.ToEventData("", et, data, nil)
-
 	stream := "Some-Stream"
-
 	url := fmt.Sprintf("/streams/%s", stream)
-
 	mux.HandleFunc(url, func(w http.ResponseWriter, r *http.Request) {
-		testMethod(t, r, "POST")
+		c.Assert(r.Method, Equals, "POST")
 
 		b, _ := ioutil.ReadAll(r.Body)
-
 		se := []Event{}
 		err := json.NewDecoder(bytes.NewReader(b)).Decode(&se)
-		if err != nil {
-			t.Error("Unexpected error decoding event data")
-		}
-
-		gtev := se[0]
-		if !reflect.DeepEqual(gtev.PrettyPrint(), ev.PrettyPrint()) {
-			t.Errorf("Data not parsed correctly. Got %#v, want %#v", gtev, ev)
-		}
+		c.Assert(err, IsNil)
+		c.Assert(se[0].PrettyPrint(), Equals, ev.PrettyPrint())
 
 		mt := "application/vnd.eventstore.events+json"
 		mediaType := r.Header.Get("Content-Type")
-		if mediaType != mt {
-			t.Errorf("EventType not set correctly on header. Got %s, want %s", mediaType, mt)
-		}
+		c.Assert(mt, Equals, mediaType)
 
 		w.WriteHeader(http.StatusCreated)
 		fmt.Fprint(w, "")
 	})
 
 	resp, err := client.AppendToStream(stream, nil, ev)
-	if err != nil {
-		t.Errorf("Events.PostEvent returned error: %v", err)
-	}
 
-	if resp.StatusMessage != "201 Created" {
-		t.Errorf("Status Message incorrect. Got: %s, want %s", resp.StatusMessage, "201 Created")
-	}
-
-	if resp.StatusCode != http.StatusCreated {
-		t.Errorf("Status Message incorrect. Got: %d, want %d", resp.StatusCode, 201)
-	}
-
+	c.Assert(err, IsNil)
+	c.Assert(resp.StatusMessage, Equals, "201 Created")
+	c.Assert(resp.StatusCode, Equals, http.StatusCreated)
 }
-func TestAppendEventsMultiple(t *testing.T) {
 
-	setup()
-	defer teardown()
+func (s *EventSuite) TestAppendEventsMultiple(c *C) {
 
 	et := "SomeEventType"
 	d1 := &MyDataType{Field1: 445, Field2: "Some string"}
@@ -107,55 +93,31 @@ func TestAppendEventsMultiple(t *testing.T) {
 	url := fmt.Sprintf("/streams/%s", stream)
 
 	mux.HandleFunc(url, func(w http.ResponseWriter, r *http.Request) {
-		testMethod(t, r, "POST")
+		c.Assert(r.Method, Equals, "POST")
 
 		b, _ := ioutil.ReadAll(r.Body)
-
 		se := []Event{}
 		err := json.NewDecoder(bytes.NewReader(b)).Decode(&se)
-		if err != nil {
-			t.Error("Unexpected error decoding event data")
-		}
-
-		gt1 := se[0]
-		if !reflect.DeepEqual(gt1.PrettyPrint(), ev1.PrettyPrint()) {
-			t.Errorf("Data not parsed correctly. Got %#v, want %#v", gt1, ev1)
-		}
-		gt2 := se[1]
-		if !reflect.DeepEqual(gt2.PrettyPrint(), ev2.PrettyPrint()) {
-			t.Errorf("Data not parsed correctly. Got %#v, want %#v", gt2, ev2)
-		}
+		c.Assert(err, IsNil)
+		c.Assert(se[0].PrettyPrint(), Equals, ev1.PrettyPrint())
+		c.Assert(se[1].PrettyPrint(), Equals, ev2.PrettyPrint())
 
 		mt := "application/vnd.eventstore.events+json"
 		mediaType := r.Header.Get("Content-Type")
-		if mediaType != mt {
-			t.Errorf("EventType not set correctly on header. Got %s, want %s", mediaType, mt)
-		}
+		c.Assert(mt, Equals, mediaType)
 
 		w.WriteHeader(http.StatusCreated)
 		fmt.Fprint(w, "")
 	})
 
 	resp, err := client.AppendToStream(stream, nil, ev1, ev2)
-	if err != nil {
-		t.Errorf("Events.PostEvent returned error: %v", err)
-	}
 
-	if resp.StatusMessage != "201 Created" {
-		t.Errorf("Status Message incorrect. Got: %s, want %s", resp.StatusMessage, "201 Created")
-	}
-
-	if resp.StatusCode != http.StatusCreated {
-		t.Errorf("Status Message incorrect. Got: %d, want %d", resp.StatusCode, 201)
-	}
-
+	c.Assert(err, IsNil)
+	c.Assert(resp.StatusMessage, Equals, "201 Created")
+	c.Assert(resp.StatusCode, Equals, http.StatusCreated)
 }
 
-func TestAppendEventsWithExpectedVersion(t *testing.T) {
-
-	setup()
-	defer teardown()
-
+func (s *EventSuite) TestAppendEventsWithExpectedVersion(c *C) {
 	data := &MyDataType{Field1: 445, Field2: "Some string"}
 	et := "SomeEventType"
 	ev := client.ToEventData("", et, data, nil)
@@ -166,37 +128,23 @@ func TestAppendEventsWithExpectedVersion(t *testing.T) {
 	expectedVersion := &StreamVersion{Number: 5}
 
 	mux.HandleFunc(url, func(w http.ResponseWriter, r *http.Request) {
-		testMethod(t, r, "POST")
+		c.Assert(r.Method, Equals, "POST")
 
 		want := strconv.Itoa(expectedVersion.Number)
 		got := r.Header.Get("ES-ExpectedVersion")
-		if got != want {
-			t.Errorf("Expected Version not set correctly on header. Got %s, want %s", got, want)
-		}
+		c.Assert(got, Equals, want)
 
 		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprint(w, "")
 	})
 
 	resp, err := client.AppendToStream(stream, expectedVersion, ev)
-	if err == nil {
-		t.Error("Expecting an error")
-	}
-
-	if resp.StatusMessage != "400 Bad Request" {
-		t.Errorf("Status Message incorrect. Got: %s, want %s", resp.StatusMessage, "400 Bad Request")
-	}
-
-	if resp.StatusCode != http.StatusBadRequest {
-		t.Errorf("Status Message incorrect. Got: %d, want %d", resp.StatusCode, 400)
-	}
-
+	c.Assert(err, NotNil)
+	c.Assert(resp.StatusMessage, Equals, "400 Bad Request")
+	c.Assert(resp.StatusCode, Equals, http.StatusBadRequest)
 }
 
-func TestGetEvent(t *testing.T) {
-	setup()
-	defer teardown()
-
+func (s *EventSuite) TestGetEvent(c *C) {
 	stream := "GetEventStream"
 	es := createTestEvents(1, stream, server.URL, "SomeEventType")
 	ti := Time(time.Now())
@@ -207,49 +155,32 @@ func TestGetEvent(t *testing.T) {
 	str := er.PrettyPrint()
 
 	mux.HandleFunc("/streams/some-stream/299", func(w http.ResponseWriter, r *http.Request) {
-
 		got := r.Header.Get("Accept")
 		want := "application/vnd.eventstore.atom+json"
-
-		if !reflect.DeepEqual(got, want) {
-			t.Errorf("Got: %s Want: %s", got, want)
-		}
+		c.Assert(got, Equals, want)
 
 		fmt.Fprint(w, str)
 	})
 
 	got, _, err := client.GetEvent("/streams/some-stream/299")
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-
-	if !reflect.DeepEqual(got.PrettyPrint(), want.PrettyPrint()) {
-		t.Errorf("Got\n %+v\n Want\n %+v", got.PrettyPrint(), want.PrettyPrint())
-	}
+	c.Assert(err, IsNil)
+	c.Assert(got.PrettyPrint(), Equals, want.PrettyPrint())
 }
 
-func TestGetEventURLs(t *testing.T) {
-
+func (s *EventSuite) TestGetEventURLs(c *C) {
 	es := createTestEvents(2, "some-stream", "http://localhost:2113", "EventTypeX")
 	f, _ := createTestFeed(es, "http://localhost:2113/streams/some-stream/head/backward/2")
 
 	got, err := getEventURLs(f)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-
+	c.Assert(err, IsNil)
 	want := []string{
 		"http://localhost:2113/streams/some-stream/1",
 		"http://localhost:2113/streams/some-stream/0",
 	}
-
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("Got:\n %+v\n Want:\n %+v\n", got, want)
-	}
+	c.Assert(got, DeepEquals, want)
 }
 
 func createTestEvent(stream, server, eventType string, eventNumber int, data *json.RawMessage, meta *json.RawMessage) *Event {
-
 	e := Event{}
 	e.EventStreamID = stream
 	e.EventNumber = eventNumber
@@ -275,13 +206,10 @@ func createTestEvent(stream, server, eventType string, eventNumber int, data *js
 		e.MetaData = &mraw
 	}
 	return &e
-
 }
 
 func createTestEvents(numEvents int, stream string, server string, eventTypes ...string) []*Event {
-
 	se := []*Event{}
-
 	for i := 0; i < numEvents; i++ {
 		r := rand.Intn(len(eventTypes))
 		eventType := eventTypes[r]
@@ -296,7 +224,6 @@ func createTestEvents(numEvents int, stream string, server string, eventTypes ..
 		e := createTestEvent(stream, server, eventType, i, &raw, &mraw)
 
 		se = append(se, e)
-
 	}
 	return se
 }

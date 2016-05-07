@@ -11,14 +11,23 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
-	"reflect"
 	"strings"
-	"testing"
+
+	. "gopkg.in/check.v1"
 )
 
-func TestGetAtomPage(t *testing.T) {
+var _ = Suite(&StreamSuite{})
+
+type StreamSuite struct{}
+
+func (s *StreamSuite) SetUpTest(c *C) {
 	setup()
-	defer teardown()
+}
+func (s *StreamSuite) TearDownTest(c *C) {
+	teardown()
+}
+
+func (s *StreamSuite) TestGetAtomPage(c *C) {
 
 	stream := "some-stream"
 	path := fmt.Sprintf("/streams/%s/head/backward/20", stream)
@@ -26,34 +35,19 @@ func TestGetAtomPage(t *testing.T) {
 
 	es := createTestEvents(2, stream, server.URL, "EventTypeX")
 	f, _ := createTestFeed(es, url)
-	want := f.PrettyPrint()
 
 	mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
-		testMethod(t, r, "GET")
-
-		fmt.Fprint(w, want)
-		if r.Header.Get("Accept") != "application/atom+xml" {
-			t.Errorf("Accepts header incorrect. Got %s want %s", r.Header.Get("Accept"), "application/atom+xml")
-		}
+		c.Assert(r.Method, Equals, "GET")
+		fmt.Fprint(w, f.PrettyPrint())
+		c.Assert(r.Header.Get("Accept"), Equals, "application/atom+xml")
 	})
 
 	feed, resp, _ := client.readFeed(url)
-	if !reflect.DeepEqual(resp.StatusCode, http.StatusOK) {
-		t.Errorf("Incorrect response code returned. Got %d Want %d", resp.StatusCode, http.StatusOK)
-	}
-
-	got := feed.PrettyPrint()
-
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("Feed returned was incorrect. \nGot: %+v\n\n Want %+v\n", got, want)
-	}
-
+	c.Assert(feed.PrettyPrint(), DeepEquals, f.PrettyPrint())
+	c.Assert(resp.StatusCode, DeepEquals, http.StatusOK)
 }
 
-func TestUnmarshalFeed(t *testing.T) {
-	setup()
-	defer teardown()
-
+func (s *StreamSuite) TestUnmarshalFeed(c *C) {
 	stream := "unmarshal-feed"
 	count := 2
 
@@ -64,38 +58,23 @@ func TestUnmarshalFeed(t *testing.T) {
 	want := wf.PrettyPrint()
 
 	gf, err := unmarshalFeed(strings.NewReader(want))
-	if err != nil {
-		t.Errorf("Unexpected error: %s", err)
-	}
+	c.Assert(err, IsNil)
 	got := gf.PrettyPrint()
 
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("Error unmarshalling Feed: \nGot \n%+v \n want %+v\n", got, want)
-	}
-
+	c.Assert(got, DeepEquals, want)
 }
 
-func TestRunServer(t *testing.T) {
-
-	setup()
-	defer teardown()
-
+func (s *StreamSuite) TestRunServer(c *C) {
 	stream := "astream"
 	es := createTestEvents(100, stream, server.URL, "EventTypeA", "EventTypeB")
 
 	setupSimulator(es, nil)
 
 	_, _, err := client.ReadFeedBackward(stream, nil, nil)
-	if err != nil {
-		t.Errorf("Unexpected error: %s", err)
-	}
-
+	c.Assert(err, IsNil)
 }
 
-func TestReadFeedBackwardError(t *testing.T) {
-	setup()
-	defer teardown()
-
+func (s *StreamSuite) TestReadFeedBackwardError(c *C) {
 	stream := "ABigStream"
 	errWant := errors.New("Stream Does Not Exist")
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -103,19 +82,11 @@ func TestReadFeedBackwardError(t *testing.T) {
 	})
 
 	_, resp, err := client.ReadFeedBackward(stream, nil, nil)
-	if err == nil {
-		t.Errorf("Got %v Want %v", err, errWant)
-	}
-
-	if resp.StatusCode != http.StatusNotFound {
-		t.Errorf("Got %v Want %v", resp.StatusCode, http.StatusNotFound)
-	}
+	c.Assert(err, NotNil)
+	c.Assert(resp.StatusCode, Equals, http.StatusNotFound)
 }
 
-func TestReadFeedBackwardFromVersionAll(t *testing.T) {
-	setup()
-	defer teardown()
-
+func (s *StreamSuite) TestReadFeedBackwardFromVersionAll(c *C) {
 	stream := "ABigStream"
 	ne := 1000
 	es := createTestEvents(ne, stream, server.URL, "EventTypeX")
@@ -125,37 +96,18 @@ func TestReadFeedBackwardFromVersionAll(t *testing.T) {
 	ver := &StreamVersion{Number: 100}
 
 	evs, _, err := client.ReadFeedBackward(stream, ver, nil)
-	if err != nil {
-		t.Errorf("Unexpected Error %s", err.Error())
-	}
-
+	c.Assert(err, IsNil)
 	nex := ver.Number + 1
-
-	if len(evs) != nex {
-		t.Errorf("Got: %d Want: %d", len(evs), nex)
-		return
-	}
-
-	if evs[0].Event.EventNumber != ver.Number {
-		t.Errorf("Got %d Want %d", evs[0].Event.EventNumber, ver.Number)
-	}
-
-	if evs[len(evs)-1].Event.EventNumber != 0 {
-		t.Errorf("Got %d Want %d", evs[len(evs)-1].Event.EventNumber, 0)
-	}
-
+	c.Assert(evs, HasLen, nex)
+	c.Assert(evs[0].Event.EventNumber, Equals, ver.Number)
+	c.Assert(evs[len(evs)-1].Event.EventNumber, Equals, 0)
 	for k, v := range evs {
 		ex := (nex - 1) - k
-		if v.Event.EventNumber != ex {
-			t.Errorf("Got %d Want %d", v.Event.EventNumber, ex)
-		}
+		c.Assert(v.Event.EventNumber, Equals, ex)
 	}
 }
 
-func TestReadFeedBackwardAll(t *testing.T) {
-	setup()
-	defer teardown()
-
+func (s *StreamSuite) TestReadFeedBackwardAll(c *C) {
 	stream := "ABigStream"
 	ne := 1000
 	es := createTestEvents(ne, stream, server.URL, "EventTypeX")
@@ -163,35 +115,17 @@ func TestReadFeedBackwardAll(t *testing.T) {
 	setupSimulator(es, nil)
 
 	evs, _, err := client.ReadFeedBackward(stream, nil, nil)
-	if err != nil {
-		t.Errorf("Unexpected Error %s", err.Error())
-	}
-
-	if len(evs) != ne {
-		t.Errorf("Got: %d Want: %d", len(evs), ne)
-		return
-	}
-
-	if evs[0].Event.EventNumber != ne-1 {
-		t.Errorf("Got %d Want %d", evs[0].Event.EventNumber, ne-1)
-	}
-
-	if evs[len(evs)-1].Event.EventNumber != 0 {
-		t.Errorf("Got %d Want %d", evs[len(evs)-1].Event.EventNumber, 0)
-	}
-
+	c.Assert(err, IsNil)
+	c.Assert(evs, HasLen, ne)
+	c.Assert(evs[0].Event.EventNumber, Equals, ne-1)
+	c.Assert(evs[len(evs)-1].Event.EventNumber, Equals, 0)
 	for k, v := range evs {
 		ex := (ne - 1) - k
-		if v.Event.EventNumber != ex {
-			t.Errorf("Got %d Want %d", v.Event.EventNumber, ex)
-		}
+		c.Assert(v.Event.EventNumber, Equals, ex)
 	}
 }
 
-func TestReadFeedForwardError(t *testing.T) {
-	setup()
-	defer teardown()
-
+func (s *StreamSuite) TestReadFeedForwardError(c *C) {
 	stream := "ABigStream"
 	errWant := errors.New("Stream Does Not Exist")
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -199,19 +133,11 @@ func TestReadFeedForwardError(t *testing.T) {
 	})
 
 	_, resp, err := client.ReadFeedForward(stream, nil, nil)
-	if err == nil {
-		t.Errorf("Got %v Want %v", err, errWant)
-	}
-
-	if resp.StatusCode != http.StatusNotFound {
-		t.Errorf("Got %v Want %v", resp.StatusCode, http.StatusNotFound)
-	}
+	c.Assert(err, NotNil)
+	c.Assert(resp.StatusCode, Equals, http.StatusNotFound)
 }
 
-func TestReadFeedBackwardFromVersionWithTake(t *testing.T) {
-	setup()
-	defer teardown()
-
+func (s *StreamSuite) TestReadFeedBackwardFromVersionWithTake(c *C) {
 	stream := "ABigStream"
 	ne := 1000
 	es := createTestEvents(ne, stream, server.URL, "EventTypeX")
@@ -222,38 +148,20 @@ func TestReadFeedBackwardFromVersionWithTake(t *testing.T) {
 	take := &Take{Number: 14}
 
 	evs, _, err := client.ReadFeedBackward(stream, ver, take)
-	if err != nil {
-		t.Errorf("Unexpected Error %s", err.Error())
-	}
-
+	c.Assert(err, IsNil)
 	nex := take.Number
-
-	if len(evs) != nex {
-		t.Errorf("Got: %d Want: %d", len(evs), nex)
-	}
+	c.Assert(evs, HasLen, nex)
 
 	lstn := ver.Number - (take.Number - 1)
-
-	if evs[0].Event.EventNumber != ver.Number {
-		t.Errorf("Got %d Want %d", evs[0].Event.EventNumber, ver.Number)
-	}
-
-	if evs[len(evs)-1].Event.EventNumber != lstn {
-		t.Errorf("Got %d Want %d", evs[len(evs)-1].Event.EventNumber, lstn)
-	}
-
+	c.Assert(evs[0].Event.EventNumber, Equals, ver.Number)
+	c.Assert(evs[len(evs)-1].Event.EventNumber, Equals, lstn)
 	for k, v := range evs {
 		ex := ver.Number - k
-		if v.Event.EventNumber != ex {
-			t.Errorf("Got %d Want %d", v.Event.EventNumber, ex)
-		}
+		c.Assert(v.Event.EventNumber, Equals, ex)
 	}
 }
 
-func TestReadFeedBackwardFromVersionWithTakeOutOfRangeUnder(t *testing.T) {
-	setup()
-	defer teardown()
-
+func (s *StreamSuite) TestReadFeedBackwardFromVersionWithTakeOutOfRangeUnder(c *C) {
 	stream := "ABigStream"
 	ne := 1000
 	es := createTestEvents(ne, stream, server.URL, "EventTypeX")
@@ -264,79 +172,44 @@ func TestReadFeedBackwardFromVersionWithTakeOutOfRangeUnder(t *testing.T) {
 	take := &Take{Number: 59}
 
 	evs, _, err := client.ReadFeedBackward(stream, ver, take)
-	if err != nil {
-		t.Errorf("Unexpected Error %s", err.Error())
-	}
+	c.Assert(err, IsNil)
 
 	nex := ver.Number + 1
-
-	if len(evs) != nex {
-		t.Errorf("Got: %d Want: %d", len(evs), nex)
-	}
+	c.Assert(evs, HasLen, nex)
 
 	lstn := 0
-
-	if evs[0].Event.EventNumber != ver.Number {
-		t.Errorf("Got %d Want %d", evs[0].Event.EventNumber, ver.Number)
-	}
-
-	if evs[len(evs)-1].Event.EventNumber != lstn {
-		t.Errorf("Got %d Want %d", evs[len(evs)-1].Event.EventNumber, lstn)
-	}
-
+	c.Assert(evs[0].Event.EventNumber, Equals, ver.Number)
+	c.Assert(evs[len(evs)-1].Event.EventNumber, Equals, lstn)
 	for k, v := range evs {
 		ex := ver.Number - k
-		if v.Event.EventNumber != ex {
-			t.Errorf("Got %d Want %d", v.Event.EventNumber, ex)
-		}
+		c.Assert(v.Event.EventNumber, Equals, ex)
 	}
 }
 
 //Try to get versions past head of stream that do not yet exist
 //this use case is used to poll head of stream waiting for new events
-func TestReadFeedForwardTail(t *testing.T) {
-	setup()
-	defer teardown()
-
+func (s *StreamSuite) TestReadFeedForwardTail(c *C) {
 	stream := "ABigStream"
 	ne := 1000
 	es := createTestEvents(ne, stream, server.URL, "EventTypeX")
-
 	setupSimulator(es, nil)
-
 	ver := &StreamVersion{Number: 1000}
 
 	evs, _, err := client.ReadFeedForward(stream, ver, nil)
-	if err != nil {
-		t.Errorf("Unexpected Error %s", err.Error())
-	}
 
-	nex := 0
-
-	if len(evs) != nex {
-		t.Errorf("Got: %d Want: %d", len(evs), nex)
-	}
+	c.Assert(err, IsNil)
+	c.Assert(evs, HasLen, 0)
 }
 
-func TestGetFeedURLInvalidVersion(t *testing.T) {
-	setup()
-	defer teardown()
-
+func (s *StreamSuite) TestGetFeedURLInvalidVersion(c *C) {
 	stream := "ABigStream"
-
 	ver := &StreamVersion{Number: -1}
 
 	_, err := getFeedURL(stream, "forward", ver, nil)
-	if got, ok := err.(invalidVersionError); !ok {
-		want := invalidVersionError(ver.Number)
-		t.Errorf("Got %#v\n Want %#v\n", got, want)
-	}
+	c.Assert(err, FitsTypeOf, invalidVersionError(ver.Number))
 }
 
-func TestReadFeedForwardAll(t *testing.T) {
-	setup()
-	defer teardown()
-
+func (s *StreamSuite) TestReadFeedForwardAll(c *C) {
 	stream := "ABigStream"
 	ne := 1000
 	es := createTestEvents(ne, stream, server.URL, "EventTypeX")
@@ -344,134 +217,78 @@ func TestReadFeedForwardAll(t *testing.T) {
 	setupSimulator(es, nil)
 
 	evs, _, err := client.ReadFeedForward(stream, nil, nil)
-	if err != nil {
-		t.Errorf("Unexpected Error %s", err.Error())
-	}
-
-	nex := ne
-
-	if len(evs) != nex {
-		t.Errorf("Got: %d Want: %d", len(evs), nex)
-		return
-	}
-
-	lstn := ne - 1
-	fstn := 0
-
-	if evs[0].Event.EventNumber != fstn {
-		t.Errorf("Got %d Want %d", evs[0].Event.EventNumber, fstn)
-	}
-
-	if evs[len(evs)-1].Event.EventNumber != lstn {
-		t.Errorf("Got %d Want %d", evs[len(evs)-1].Event.EventNumber, lstn)
-	}
-
+	c.Assert(err, IsNil)
+	c.Assert(evs, HasLen, ne)
+	c.Assert(evs[0].Event.EventNumber, Equals, 0)
+	c.Assert(evs[len(evs)-1].Event.EventNumber, Equals, ne-1)
 	for k, v := range evs {
-		ex := k
-		if v.Event.EventNumber != ex {
-			t.Errorf("Got %d Want %d", v.Event.EventNumber, ex)
-		}
+		c.Assert(v.Event.EventNumber, Equals, k)
 	}
 }
 
-func TestGetFeedURLForwardLowTake(t *testing.T) {
+func (s *StreamSuite) TestGetFeedURLForwardLowTake(c *C) {
 	want := "/streams/some-stream/0/forward/10"
 	got, _ := getFeedURL("some-stream", "forward", nil, &Take{Number: 10})
-	if got != want {
-		t.Errorf("Got %s Want %s", got, want)
-	}
+	c.Assert(got, Equals, want)
 }
 
-func TestGetFeedURLBackwardLowTake(t *testing.T) {
+func (s *StreamSuite) TestGetFeedURLBackwardLowTake(c *C) {
 	want := "/streams/some-stream/head/backward/15"
 	got, _ := getFeedURL("some-stream", "backward", nil, &Take{Number: 15})
-	if got != want {
-		t.Errorf("Got %s Want %s", got, want)
-	}
+	c.Assert(got, Equals, want)
 }
 
-func TestGetFeedURLInvalidDirection(t *testing.T) {
+func (s *StreamSuite) TestGetFeedURLInvalidDirection(c *C) {
 	want := errors.New("Invalid Direction")
 	_, got := getFeedURL("some-stream", "nonesense", nil, nil)
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("Got %s Want %s", got, want)
-	}
+	c.Assert(got, DeepEquals, want)
 }
 
-func TestGetFeedURLBackwardNilAll(t *testing.T) {
+func (s *StreamSuite) TestGetFeedURLBackwardNilAll(c *C) {
 	want := "/streams/some-stream/head/backward/100"
 	got, _ := getFeedURL("some-stream", "", nil, nil)
-	if got != want {
-		t.Errorf("Got %s Want %s", got, want)
-	}
+	c.Assert(got, Equals, want)
 }
 
-func TestGetFeedURLForwardNilAll(t *testing.T) {
+func (s *StreamSuite) TestGetFeedURLForwardNilAll(c *C) {
 	want := "/streams/some-stream/0/forward/100"
 	got, _ := getFeedURL("some-stream", "forward", nil, nil)
-	if got != want {
-		t.Errorf("Got %s Want %s", got, want)
-	}
+	c.Assert(got, Equals, want)
 }
 
-func TestGetFeedURLForwardVersioned(t *testing.T) {
+func (s *StreamSuite) TestGetFeedURLForwardVersioned(c *C) {
 	want := "/streams/some-stream/15/forward/100"
 	got, _ := getFeedURL("some-stream", "forward", &StreamVersion{Number: 15}, nil)
-	if got != want {
-		t.Errorf("Got %s Want %s", got, want)
-	}
+	c.Assert(got, Equals, want)
 }
 
-func Test_GetMetaReturnsNilWhenStreamMetaDataIsEmpty(t *testing.T) {
-	setup()
-	defer teardown()
-
+func (s *StreamSuite) TestGetMetaReturnsNilWhenStreamMetaDataIsEmpty(c *C) {
 	stream := "Some-Stream"
-
 	es := createTestEvents(10, stream, server.URL, "EventTypeX")
-
 	setupSimulator(es, nil)
 
 	got, resp, err := client.GetStreamMetaData(stream)
-	if err != nil {
-		t.Errorf("Unexpected error: %s\n", err)
-	}
 
-	if got != nil {
-		t.Errorf("Want %v\n, Got: %v\n", nil, got)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("Got: %d Want %d\n", resp.StatusCode, http.StatusOK)
-	}
+	c.Assert(err, IsNil)
+	c.Assert(got, IsNil)
+	c.Assert(resp.StatusCode, Equals, http.StatusOK)
 }
 
-func TestGetMetaData(t *testing.T) {
-	setup()
-	defer teardown()
-
+func (s *StreamSuite) TestGetMetaData(c *C) {
 	d := fmt.Sprintf("{ \"foo\" : %d }", rand.Intn(9999))
 	raw := json.RawMessage(d)
-
 	stream := "Some-Stream"
-
 	es := createTestEvents(10, stream, server.URL, "EventTypeX")
 	m := createTestEvent(stream, server.URL, "metadata", 10, &raw, nil)
 	want, _ := createTestEventResponse(m, nil)
-
 	setupSimulator(es, m)
 
 	got, _, _ := client.GetStreamMetaData(stream)
-	if !reflect.DeepEqual(got.PrettyPrint(), want.PrettyPrint()) {
-		t.Errorf("Got: %s\n Want %s\n ", got.PrettyPrint(), want.PrettyPrint())
-	}
+
+	c.Assert(got.PrettyPrint(), Equals, want.PrettyPrint())
 }
 
-func TestAppendStreamMetadata(t *testing.T) {
-
-	setup()
-	defer teardown()
-
+func (s *StreamSuite) TestAppendStreamMetadata(c *C) {
 	eventType := "MetaData"
 	stream := "Some-Stream"
 
@@ -492,47 +309,20 @@ func TestAppendStreamMetadata(t *testing.T) {
 	url := fmt.Sprintf("/streams/%s/metadata", stream)
 
 	mux.HandleFunc(url, func(w http.ResponseWriter, r *http.Request) {
-		testMethod(t, r, "POST")
+		c.Assert(r.Method, Equals, "POST")
 
 		var got json.RawMessage
 		ev := &Event{Data: &got}
 		err := json.NewDecoder(r.Body).Decode(ev)
-		if err != nil {
-			t.Errorf("Unexpected error %#v", err)
-		}
-
-		if !reflect.DeepEqual(string(got), string(want)) {
-			t.Errorf("Got\n %#v\n Want\n %#v\n", string(got), string(want))
-		}
+		c.Assert(err, IsNil)
+		c.Assert(got, DeepEquals, want)
 
 		w.WriteHeader(http.StatusCreated)
 		fmt.Fprint(w, "")
 	})
 
 	resp, err := client.UpdateStreamMetaData(stream, &want)
-	if err != nil {
-		t.Errorf("UpdateMetadata returned error: %v", err)
-	}
-
-	if resp.StatusMessage != "201 Created" {
-		t.Errorf("Status Message incorrect. Got: %s, want %s", resp.StatusMessage, "201 Created")
-	}
-
-	if resp.StatusCode != http.StatusCreated {
-		t.Errorf("Status Message incorrect. Got: %d, want %d", resp.StatusCode, 201)
-	}
-
+	c.Assert(err, IsNil)
+	c.Assert(resp.StatusMessage, Equals, "201 Created")
+	c.Assert(resp.StatusCode, Equals, http.StatusCreated)
 }
-
-//func TestAppendWithMetaDataMap(t *testing.T) {
-
-////stream := "some-stream"
-//data := &MyDataType{5, "Some Data"}
-//meta := make(map[string]interface{})
-//meta["first"] = "Some string"
-//meta["second"] = 9
-//meta["third"] = data
-//ev := client.ToEventData("", "EventType", data, meta)
-
-//fmt.Println(ev.PrettyPrint())
-//}

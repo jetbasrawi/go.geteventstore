@@ -9,7 +9,23 @@ import (
 	"net/url"
 	"reflect"
 	"testing"
+
+	. "gopkg.in/check.v1"
 )
+
+func Test(t *testing.T) { TestingT(t) }
+
+var _ = Suite(&GoesSuite{})
+
+type GoesSuite struct{}
+
+func (s *GoesSuite) SetUpTest(c *C) {
+	setup()
+}
+
+func (s *GoesSuite) TearDownTest(c *C) {
+	teardown()
+}
 
 const (
 	defaultBaseURL = "http://somedomain:2113/"
@@ -25,8 +41,6 @@ var (
 
 	// server is a test HTTP server used to provide mack API responses
 	server *httptest.Server
-
-	eventStructJSON = `{"eventType":"SomeEventType","eventId":"some-uuid","data":"some-string"}`
 )
 
 func setup() {
@@ -46,86 +60,51 @@ func teardown() {
 	server.Close()
 }
 
-func testMethod(t *testing.T, r *http.Request, want string) {
-	if got := r.Method; got != want {
-		t.Errorf("Request method: %v, want %v", got, want)
-	}
-}
-
-func testURLParseError(t *testing.T, err error) {
-	if err == nil {
-		t.Errorf("Expected error to be returned")
-	}
-	if err, ok := err.(*url.Error); !ok || err.Op != "parse" {
-		t.Errorf("Expected URL parse error, got %+v", err)
-	}
-}
-
-func TestNewClient(t *testing.T) {
-	setup()
-	defer teardown()
-
+func (s *GoesSuite) TestNewClient(c *C) {
 	invalidURL := ":"
+	client, err := NewClient(nil, invalidURL)
+	c.Assert(err, ErrorMatches, "parse :: missing protocol scheme")
 
-	c, err := NewClient(nil, invalidURL)
-	testURLParseError(t, err)
-
-	c, _ = NewClient(nil, defaultBaseURL)
-
-	if got, want := c.BaseURL.String(), defaultBaseURL; got != want {
-		t.Errorf("NewClient BaseURL is %v want %v", got, want)
-	}
-
+	client, _ = NewClient(nil, defaultBaseURL)
+	got, want := client.BaseURL.String(), defaultBaseURL
+	c.Assert(got, Equals, want)
 }
 
-func TestNewRequest(t *testing.T) {
-	c, _ := NewClient(nil, defaultBaseURL)
-
+func (s *GoesSuite) TestNewRequest(c *C) {
+	client, _ := NewClient(nil, defaultBaseURL)
 	inURL, outURL := "/foo", defaultBaseURL+"foo"
 	inBody := &Event{EventID: "some-uuid", EventType: "SomeEventType", Data: "some-string"}
+	eventStructJSON := `{"eventType":"SomeEventType","eventId":"some-uuid","data":"some-string"}`
 	outBody := eventStructJSON + "\n"
-	req, _ := c.newRequest("GET", inURL, inBody)
+	req, _ := client.newRequest("GET", inURL, inBody)
 
 	contentType := "application/vnd.eventstore.events+json"
 
 	// test that the relative url was concatenated
-	if got, want := req.URL.String(), outURL; got != want {
-		t.Errorf("NewRequest(%q) URL is %v, want %v", inURL, got, want)
-	}
+	c.Assert(req.URL.String(), Equals, outURL)
 
 	// test that body was JSON encoded
 	body, _ := ioutil.ReadAll(req.Body)
-	if got, want := string(body), outBody; got != want {
-		t.Errorf("NewRequest(%v) \nGot\n %v, \nwant\n %+v", inBody, got, want)
-	}
-
-	if got, want := req.Header.Get("Content-Type"), contentType; got != want {
-		t.Errorf("NewRequest Content-Type is %v, want %+v", got, want)
-	}
+	c.Assert(string(body), Equals, outBody)
+	c.Assert(req.Header.Get("Content-Type"), Equals, contentType)
 }
 
-func TestNewRequest_invalidJSON(t *testing.T) {
-
-	c, _ := NewClient(nil, defaultBaseURL)
-
+func (s *GoesSuite) TestNewRequestWithInvalidJSONReturnsError(c *C) {
+	client, _ := NewClient(nil, defaultBaseURL)
 	type T struct {
 		A map[int]interface{}
 	}
-	_, err := c.newRequest("GET", "/", &T{})
-
-	if err == nil {
-		t.Error("Expected error to be returned.")
-
-	}
-	if err, ok := err.(*json.UnsupportedTypeError); !ok {
-		t.Errorf("Expected a JSON error; got %#v.", err)
-	}
+	ti := &T{}
+	_, err := client.newRequest("GET", "/", ti)
+	c.Assert(err, NotNil)
+	tp := reflect.TypeOf(ti.A)
+	c.Assert(err, FitsTypeOf, &json.UnsupportedTypeError{tp})
 }
 
-func TestNewRequest_badURL(t *testing.T) {
-	c, _ := NewClient(nil, defaultBaseURL)
-	_, err := c.newRequest("GET", ":", nil)
-	testURLParseError(t, err)
+func (s *GoesSuite) TestNewRequestWithBadURLReturnsError(c *C) {
+	clit, _ := NewClient(nil, defaultBaseURL)
+	_, err := clit.newRequest("GET", ":", nil)
+	c.Assert(err, ErrorMatches, "parse :: missing protocol scheme")
 }
 
 // If a nil body is passed to the API, make sure that nil is also
@@ -134,52 +113,37 @@ func TestNewRequest_badURL(t *testing.T) {
 // body that is an empty string versus one that is not set at all.  However in
 // certain cases, intermediate systems may treat these differently resulting in
 // subtle errors.
-func TestNewRequest_emptyBody(t *testing.T) {
-	c, _ := NewClient(nil, defaultBaseURL)
-	req, err := c.newRequest("GET", "/", nil)
-	if err != nil {
-		t.Fatalf("NewRequest returned unexpected error: %v", err)
-	}
-	if req.Body != nil {
-		t.Fatalf("constructed request contains a non-nil Body")
-	}
+func (s *GoesSuite) TestNewRequestWithEmptyBody(c *C) {
+	clit, _ := NewClient(nil, defaultBaseURL)
+	req, err := clit.newRequest("GET", "/", nil)
+	c.Assert(err, IsNil)
+	c.Assert(req.Body, IsNil)
 }
 
-func TestDo(t *testing.T) {
-	setup()
-	defer teardown()
+func (s *GoesSuite) TestDo(c *C) {
 
-	body := eventStructJSON
+	te := createTestEvents(1, "some-stream", "localhost:2113", "SomeEventType")
+	body := te[0].Data
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		if m := "POST"; m != r.Method {
-			t.Errorf("Request method = %v, want %v", r.Method, m)
-		}
+		c.Assert(r.Method, Equals, "POST")
 		w.WriteHeader(http.StatusCreated)
 		fmt.Fprint(w, body)
-
 	})
 
 	req, _ := client.newRequest("POST", "/", nil)
-
 	resp, err := client.do(req, nil)
-	if err != nil {
-		t.Errorf("An error ocurred %v", err)
+	c.Assert(err, IsNil)
 
-	}
+	want := &Response{
+		Response:      resp.Response,
+		StatusCode:    http.StatusCreated,
+		StatusMessage: "201 Created"}
 
-	want := &Response{Response: resp.Response, StatusCode: http.StatusCreated, StatusMessage: "201 Created"}
-
-	if !reflect.DeepEqual(want, resp) {
-		t.Errorf("Response not as expected. Got: %#v Want: %#v", resp, want)
-	}
-
+	c.Assert(want, DeepEquals, resp)
 }
 
-func TestErrorResponseContainsCopyOfTheOriginalRequest(t *testing.T) {
-	setup()
-	defer teardown()
-
+func (s *GoesSuite) TestErrorResponseContainsCopyOfTheOriginalRequest(c *C) {
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprintf(w, "")
@@ -190,21 +154,16 @@ func TestErrorResponseContainsCopyOfTheOriginalRequest(t *testing.T) {
 	_, err := client.do(req, nil)
 
 	if e, ok := err.(*ErrorResponse); ok {
-		if !reflect.DeepEqual(e.Request, req) {
-			t.Errorf("Got\n %#v\n Want\n %#v\n", e.Request, req)
-		}
+		c.Assert(e.Request, DeepEquals, req)
+	} else {
+		c.FailNow()
 	}
 }
 
-func TestErrorResponseContainsStatusCodeAndMessage(t *testing.T) {
-	setup()
-	defer teardown()
-
+func (s *GoesSuite) TestErrorResponseContainsStatusCodeAndMessage(c *C) {
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
-
 		fmt.Fprintf(w, "Response Body")
-
 	})
 
 	req, _ := client.newRequest("POST", "/", nil)
@@ -212,21 +171,14 @@ func TestErrorResponseContainsStatusCodeAndMessage(t *testing.T) {
 	_, err := client.do(req, nil)
 
 	if e, ok := err.(*ErrorResponse); ok {
-		if e.StatusCode != http.StatusBadRequest {
-			t.Errorf("Got %d Want %d", e.StatusCode, http.StatusBadRequest)
-		}
-
-		want := "400 Bad Request"
-		if e.Message != want {
-			t.Errorf("Got %s, Want %s", e.Message, want)
-		}
+		c.Assert(e.StatusCode, Equals, http.StatusBadRequest)
+		c.Assert(e.Message, Equals, "400 Bad Request")
 	} else {
-		t.Errorf("Expected error should be type *ErrorResponse")
+		c.FailNow()
 	}
-
 }
 
-func TestNewResponse(t *testing.T) {
+func (s *GoesSuite) TestNewResponse(c *C) {
 
 	r := http.Response{
 		Status:     "201 Created",
@@ -235,12 +187,6 @@ func TestNewResponse(t *testing.T) {
 
 	resp := newResponse(&r)
 
-	if got, want := resp.Status, "201 Created"; got != want {
-		t.Errorf("Status Message Incorrect. Got: %s Want: %s", got, want)
-	}
-
-	if got, want := resp.StatusCode, http.StatusCreated; got != want {
-		t.Errorf("Status Code Incorrect. Got: %s Want: %s", got, want)
-	}
-
+	c.Assert(resp.Status, Equals, "201 Created")
+	c.Assert(resp.StatusCode, Equals, http.StatusCreated)
 }

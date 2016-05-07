@@ -30,8 +30,7 @@ type Take struct {
 	Number int
 }
 
-// TODO: Improve this descroption. Check if this sis stream or event metadata.
-// MetaData encapsulates the MetaData
+// MetaData encapsulates stream MetaData
 type MetaData struct {
 	EventType string      `json:"eventType"`
 	EventID   string      `json:"eventId"`
