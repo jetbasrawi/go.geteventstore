@@ -197,10 +197,19 @@ func (c *Client) ReadStreamForward(stream string, version *StreamVersion, take *
 
 // ReadStreamForwardAsync returns a channel of struct containing an *EventResponse, a *Response and an error.
 //
-// When the method has completed reading the number of events requested it will close the channel.
-// In case of an error the error will be returned on the channel. If the error occured before the
-// http request was processed the *Response will be nil. If the error occurred during the http
-// request then the *Response will contain details of the error and the http request and response.
+// If the version parameter is nil reading will begin from the start of the stream.
+// If the take parameter is nil all results to the head of the stream will be read.
+//
+// When the method has completed reading the number of events requested it will
+// close the channel.
+//
+// In case of an error, a nil EventResponse  will be returned. *Response may be nil in
+// cases where the error occured before the http request was performed to read
+// the stream. If the error occured after the http request was made, *Response
+// will be returned and will contain the raw http response, the the raw http
+// request, the http status code that was returned and the status message.
+// An *ErrorResponse will also be returned and this will contain the raw http
+// response and status and a description of the error.
 func (c *Client) ReadStreamForwardAsync(stream string, version *StreamVersion, take *Take) <-chan struct {
 	*EventResponse
 	*Response
@@ -302,6 +311,22 @@ func (c *Client) ReadStreamForwardAsync(stream string, version *StreamVersion, t
 	return eventsChannel
 }
 
+// ReadStreamBackwardAsync reads the stream backward from the version number
+// provided returning the number of results specified by the take parameter.
+//
+// If the version parameter is nil reading will begin from the head of the stream.
+// If the take parameter is nil all results to the start of the stream will be read.
+//
+// When the method has completed reading the number of events requested it will
+// close the channel.
+//
+// In case of an error, a nil EventResponse  will be returned. *Response may be nil in
+// cases where the error occured before the http request was performed to read
+// the stream. If the error occured after the http request was made, *Response
+// will be returned and will contain the raw http response, the the raw http
+// request, the http status code that was returned and the status message.
+// An *ErrorResponse will also be returned and this will contain the raw http
+// response and status and a description of the error.
 func (c *Client) ReadStreamBackwardAsync(stream string, version *StreamVersion, take *Take) <-chan struct {
 	*EventResponse
 	*Response
