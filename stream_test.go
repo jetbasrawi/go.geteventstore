@@ -242,7 +242,6 @@ func (s *StreamSuite) TestReadStreamForwardAsync(c *C) {
 		select {
 		case ev, open := <-eventsChannel:
 			if !open {
-				fmt.Println("Closed")
 				c.Assert(count, Equals, ne)
 				return
 			}
@@ -257,15 +256,41 @@ func (s *StreamSuite) TestReadStreamForwardAsync(c *C) {
 	}
 }
 
-func (s *StreamSuite) TestReadStreamForwardAsyncWithVersion(c *C) {
+func (s *StreamSuite) TestReadStreamBackwardAsync(c *C) {
 
 	stream := "SomeBigStream"
-	ne := 1000
+	ne := rand.Intn(550)
 	es := createTestEvents(ne, stream, server.URL, "EventTypeY", "EventTypeZ")
 
 	setupSimulator(es, nil)
 
-	ver := &StreamVersion{60}
+	eventsChannel := client.ReadStreamBackwardAsync(stream, nil, nil)
+	count := ne
+	for {
+		select {
+		case ev, open := <-eventsChannel:
+			if !open {
+				c.Assert(count, Equals, 0)
+				return
+			}
+			c.Assert(ev.error, IsNil)
+			c.Assert(ev.EventResponse.Event.PrettyPrint(),
+				DeepEquals,
+				es[ev.Event.EventNumber].PrettyPrint())
+			count--
+		}
+	}
+}
+
+func (s *StreamSuite) TestReadStreamForwardAsyncWithVersion(c *C) {
+
+	stream := "SomeBigStream"
+	ne := rand.Intn(550)
+	es := createTestEvents(ne, stream, server.URL, "EventTypeY", "EventTypeZ")
+
+	setupSimulator(es, nil)
+
+	ver := &StreamVersion{rand.Intn(ne)}
 	eventsChannel := client.ReadStreamForwardAsync(stream, ver, nil)
 	count := 0
 	var first *Event
@@ -274,7 +299,6 @@ func (s *StreamSuite) TestReadStreamForwardAsyncWithVersion(c *C) {
 		select {
 		case ev, open := <-eventsChannel:
 			if !open {
-				fmt.Println("Closed")
 				c.Assert(count, Equals, ne-ver.Number)
 				c.Assert(first.EventNumber, Equals, es[ver.Number].EventNumber)
 				c.Assert(last.EventNumber, DeepEquals, es[len(es)-1].EventNumber)
@@ -288,8 +312,44 @@ func (s *StreamSuite) TestReadStreamForwardAsyncWithVersion(c *C) {
 			last = ev.EventResponse.Event
 
 			c.Assert(ev.error, IsNil)
-			//fmt.Println(ev.EventResponse.Event.EventNumber)
-			//spew.Dump(ev.EventResponse.Event.EventNumber)
+			c.Assert(ev.EventResponse.Event.PrettyPrint(),
+				DeepEquals,
+				es[ev.Event.EventNumber].PrettyPrint())
+			count++
+		}
+	}
+}
+
+func (s *StreamSuite) TestReadStreamBackwardAsyncWithVersion(c *C) {
+
+	stream := "SomeBigStream"
+	ne := rand.Intn(550)
+	es := createTestEvents(ne, stream, server.URL, "EventTypeY", "EventTypeZ")
+
+	setupSimulator(es, nil)
+
+	ver := &StreamVersion{rand.Intn(ne)}
+	eventsChannel := client.ReadStreamBackwardAsync(stream, ver, nil)
+	count := 0
+	var first *Event
+	var last *Event
+	for {
+		select {
+		case ev, open := <-eventsChannel:
+			if !open {
+				c.Assert(count, Equals, ver.Number+1)
+				c.Assert(first.EventNumber, Equals, es[ver.Number].EventNumber)
+				c.Assert(last.EventNumber, DeepEquals, 0)
+				return
+			}
+
+			if first == nil {
+				first = ev.EventResponse.Event
+			}
+
+			last = ev.EventResponse.Event
+
+			c.Assert(ev.error, IsNil)
 			c.Assert(ev.EventResponse.Event.PrettyPrint(),
 				DeepEquals,
 				es[ev.Event.EventNumber].PrettyPrint())
@@ -301,13 +361,13 @@ func (s *StreamSuite) TestReadStreamForwardAsyncWithVersion(c *C) {
 func (s *StreamSuite) TestReadStreamForwardAsyncWithVersionAndTake(c *C) {
 
 	stream := "SomeBigStream"
-	ne := 1000
+	ne := rand.Intn(550)
 	es := createTestEvents(ne, stream, server.URL, "EventTypeY", "EventTypeZ")
 
 	setupSimulator(es, nil)
 
-	ver := &StreamVersion{55}
-	take := &Take{203}
+	ver := &StreamVersion{rand.Intn(ne)}
+	take := &Take{rand.Intn((ne) - ver.Number)}
 	eventsChannel := client.ReadStreamForwardAsync(stream, ver, take)
 	count := 0
 	var first *Event
@@ -316,7 +376,6 @@ func (s *StreamSuite) TestReadStreamForwardAsyncWithVersionAndTake(c *C) {
 		select {
 		case ev, open := <-eventsChannel:
 			if !open {
-				fmt.Println("Closed")
 				c.Assert(count, Equals, take.Number)
 				c.Assert(first.EventNumber, Equals, es[ver.Number].EventNumber)
 				c.Assert(last.EventNumber, DeepEquals, es[take.Number].EventNumber+ver.Number-1)
@@ -330,8 +389,46 @@ func (s *StreamSuite) TestReadStreamForwardAsyncWithVersionAndTake(c *C) {
 			last = ev.EventResponse.Event
 
 			c.Assert(ev.error, IsNil)
-			//fmt.Println(ev.EventResponse.Event.EventNumber)
-			//spew.Dump(ev.EventResponse.Event.EventNumber)
+			c.Assert(ev.EventResponse.Event.PrettyPrint(),
+				DeepEquals,
+				es[ev.Event.EventNumber].PrettyPrint())
+			count++
+		}
+	}
+}
+
+func (s *StreamSuite) TestReadStreamBackwardAsyncWithVersionAndTake(c *C) {
+
+	stream := "SomeBigStream"
+	ne := 550
+	es := createTestEvents(ne, stream, server.URL, "EventTypeY", "EventTypeZ")
+
+	setupSimulator(es, nil)
+
+	ver := &StreamVersion{450}
+	take := &Take{50}
+	eventsChannel := client.ReadStreamBackwardAsync(stream, ver, take)
+	count := 0
+	var first *Event
+	var last *Event
+	for {
+		select {
+		case ev, open := <-eventsChannel:
+			if !open {
+				c.Assert(count, Equals, take.Number)
+				c.Assert(first.EventNumber, Equals, es[ver.Number].EventNumber)
+				c.Assert(last.EventNumber, Equals, es[ver.Number-take.Number].EventNumber+1)
+				return
+			}
+
+			if first == nil {
+				first = ev.EventResponse.Event
+			}
+
+			last = ev.EventResponse.Event
+
+			fmt.Printf("Back %d\n", ev.Event.EventNumber)
+			c.Assert(ev.error, IsNil)
 			c.Assert(ev.EventResponse.Event.PrettyPrint(),
 				DeepEquals,
 				es[ev.Event.EventNumber].PrettyPrint())

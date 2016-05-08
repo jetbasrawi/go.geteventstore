@@ -195,6 +195,12 @@ func (c *Client) ReadStreamForward(stream string, version *StreamVersion, take *
 	return e, nil, nil
 }
 
+// ReadStreamForwardAsync returns a channel of struct containing an *EventResponse, a *Response and an error.
+//
+// When the method has completed reading the number of events requested it will close the channel.
+// In case of an error the error will be returned on the channel. If the error occured before the
+// http request was processed the *Response will be nil. If the error occurred during the http
+// request then the *Response will contain details of the error and the http request and response.
 func (c *Client) ReadStreamForwardAsync(stream string, version *StreamVersion, take *Take) <-chan struct {
 	*EventResponse
 	*Response
@@ -284,15 +290,114 @@ func (c *Client) ReadStreamForwardAsync(stream string, version *StreamVersion, t
 
 				count++
 
-				fmt.Printf("%d\n", count)
+				//fmt.Printf("%d\n", count)
 				if take != nil && take.Number <= count {
 					close(eventsChannel)
 					return
 				}
 			}
+		}
+	}()
 
+	return eventsChannel
+}
+
+func (c *Client) ReadStreamBackwardAsync(stream string, version *StreamVersion, take *Take) <-chan struct {
+	*EventResponse
+	*Response
+	error
+} {
+
+	eventsChannel := make(chan struct {
+		*EventResponse
+		*Response
+		error
+	})
+
+	go func() {
+		count := 0
+
+		url, err := getFeedURL(stream, "backward", version, take)
+		if err != nil {
+			eventsChannel <- struct {
+				*EventResponse
+				*Response
+				error
+			}{nil, nil, err}
+			close(eventsChannel)
+			return
 		}
 
+		for {
+
+			if url == "" {
+				close(eventsChannel)
+				return
+			}
+
+			f, resp, err := c.readStream(url)
+			if err != nil {
+				eventsChannel <- struct {
+					*EventResponse
+					*Response
+					error
+				}{nil, resp, err}
+				close(eventsChannel)
+				return
+			}
+
+			u, err := getEventURLs(f)
+			if err != nil {
+				eventsChannel <- struct {
+					*EventResponse
+					*Response
+					error
+				}{nil, nil, err}
+				close(eventsChannel)
+				return
+			}
+
+			if len(u) <= 0 {
+				close(eventsChannel)
+				return
+			}
+
+			n := ""
+			for _, v := range f.Link {
+				if v.Rel == "next" {
+					n = v.Href
+					break
+				}
+			}
+			url = n
+
+			for _, v := range u {
+				e, resp, err := c.GetEvent(v)
+				if err != nil {
+					eventsChannel <- struct {
+						*EventResponse
+						*Response
+						error
+					}{nil, resp, err}
+					close(eventsChannel)
+					return
+				}
+
+				eventsChannel <- struct {
+					*EventResponse
+					*Response
+					error
+				}{e, resp, nil}
+
+				count++
+
+				//fmt.Printf("%d\n", count)
+				if take != nil && take.Number <= count {
+					close(eventsChannel)
+					return
+				}
+			}
+		}
 	}()
 
 	return eventsChannel
