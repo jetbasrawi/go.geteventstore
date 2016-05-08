@@ -74,6 +74,7 @@ func (s *GoesSuite) TestNewRequest(c *C) {
 	client, _ := NewClient(nil, defaultBaseURL)
 	inURL, outURL := "/foo", defaultBaseURL+"foo"
 	inBody := &Event{EventID: "some-uuid", EventType: "SomeEventType", Data: "some-string"}
+	//eventStructJSON := `{"eventNumber":0,"eventType":"SomeEventType","eventId":"some-uuid","data":"some-string"}`
 	eventStructJSON := `{"eventType":"SomeEventType","eventId":"some-uuid","data":"some-string"}`
 	outBody := eventStructJSON + "\n"
 	req, _ := client.newRequest("GET", inURL, inBody)

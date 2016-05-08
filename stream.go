@@ -180,9 +180,9 @@ func (c *Client) ReadStreamForward(stream string, version *StreamVersion, take *
 		url = p
 	}
 
-	e, _, err := c.GetEvents(urls)
+	e, resp, err := c.GetEvents(urls)
 	if err != nil {
-		return nil, nil, err
+		return nil, resp, err
 	}
 	if take != nil {
 		d := len(e) - take.Number
@@ -193,6 +193,109 @@ func (c *Client) ReadStreamForward(stream string, version *StreamVersion, take *
 	}
 
 	return e, nil, nil
+}
+
+func (c *Client) ReadStreamForwardAsync(stream string, version *StreamVersion, take *Take) <-chan struct {
+	*EventResponse
+	*Response
+	error
+} {
+
+	eventsChannel := make(chan struct {
+		*EventResponse
+		*Response
+		error
+	})
+
+	go func() {
+		count := 0
+
+		url, err := getFeedURL(stream, "forward", version, take)
+		if err != nil {
+			eventsChannel <- struct {
+				*EventResponse
+				*Response
+				error
+			}{nil, nil, err}
+			close(eventsChannel)
+			return
+		}
+
+		for {
+
+			f, resp, err := c.readStream(url)
+			if err != nil {
+				eventsChannel <- struct {
+					*EventResponse
+					*Response
+					error
+				}{nil, resp, err}
+				close(eventsChannel)
+				return
+			}
+
+			u, err := getEventURLs(f)
+			if err != nil {
+				eventsChannel <- struct {
+					*EventResponse
+					*Response
+					error
+				}{nil, nil, err}
+				close(eventsChannel)
+				return
+			}
+
+			if len(u) <= 0 {
+				close(eventsChannel)
+				return
+			}
+
+			var rev []string
+			for i := len(u) - 1; i >= 0; i-- {
+				rev = append(rev, u[i])
+			}
+
+			p := ""
+			for _, v := range f.Link {
+				if v.Rel == "previous" {
+					p = v.Href
+					break
+				}
+			}
+			url = p
+
+			for _, v := range rev {
+				e, resp, err := c.GetEvent(v)
+				if err != nil {
+					eventsChannel <- struct {
+						*EventResponse
+						*Response
+						error
+					}{nil, resp, err}
+					close(eventsChannel)
+					return
+				}
+
+				eventsChannel <- struct {
+					*EventResponse
+					*Response
+					error
+				}{e, resp, nil}
+
+				count++
+
+				fmt.Printf("%d\n", count)
+				if take != nil && take.Number <= count {
+					close(eventsChannel)
+					return
+				}
+			}
+
+		}
+
+	}()
+
+	return eventsChannel
 }
 
 // ReadStreamBackward gets all events in the stream starting at the version specified

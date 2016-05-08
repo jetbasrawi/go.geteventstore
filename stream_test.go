@@ -13,6 +13,8 @@ import (
 	"net/http"
 	"strings"
 
+	//"github.com/davecgh/go-spew/spew"
+
 	. "gopkg.in/check.v1"
 )
 
@@ -42,7 +44,7 @@ func (s *StreamSuite) TestGetAtomPage(c *C) {
 		c.Assert(r.Header.Get("Accept"), Equals, "application/atom+xml")
 	})
 
-	feed, resp, _ := client.readFeed(url)
+	feed, resp, _ := client.readStream(url)
 	c.Assert(feed.PrettyPrint(), DeepEquals, f.PrettyPrint())
 	c.Assert(resp.StatusCode, DeepEquals, http.StatusOK)
 }
@@ -223,6 +225,118 @@ func (s *StreamSuite) TestReadFeedForwardAll(c *C) {
 	c.Assert(evs[len(evs)-1].Event.EventNumber, Equals, ne-1)
 	for k, v := range evs {
 		c.Assert(v.Event.EventNumber, Equals, k)
+	}
+}
+
+func (s *StreamSuite) TestReadStreamForwardAsync(c *C) {
+
+	stream := "SomeBigStream"
+	ne := 1000
+	es := createTestEvents(ne, stream, server.URL, "EventTypeY", "EventTypeZ")
+
+	setupSimulator(es, nil)
+
+	eventsChannel := client.ReadStreamForwardAsync(stream, nil, nil)
+	count := 0
+	for {
+		select {
+		case ev, open := <-eventsChannel:
+			if !open {
+				fmt.Println("Closed")
+				c.Assert(count, Equals, ne)
+				return
+			}
+
+			c.Assert(ev.error, IsNil)
+			c.Assert(ev.EventResponse.Event.PrettyPrint(),
+				DeepEquals,
+				es[ev.Event.EventNumber].PrettyPrint())
+			count++
+
+		}
+	}
+}
+
+func (s *StreamSuite) TestReadStreamForwardAsyncWithVersion(c *C) {
+
+	stream := "SomeBigStream"
+	ne := 1000
+	es := createTestEvents(ne, stream, server.URL, "EventTypeY", "EventTypeZ")
+
+	setupSimulator(es, nil)
+
+	ver := &StreamVersion{60}
+	eventsChannel := client.ReadStreamForwardAsync(stream, ver, nil)
+	count := 0
+	var first *Event
+	var last *Event
+	for {
+		select {
+		case ev, open := <-eventsChannel:
+			if !open {
+				fmt.Println("Closed")
+				c.Assert(count, Equals, ne-ver.Number)
+				c.Assert(first.EventNumber, Equals, es[ver.Number].EventNumber)
+				c.Assert(last.EventNumber, DeepEquals, es[len(es)-1].EventNumber)
+				return
+			}
+
+			if first == nil {
+				first = ev.EventResponse.Event
+			}
+
+			last = ev.EventResponse.Event
+
+			c.Assert(ev.error, IsNil)
+			//fmt.Println(ev.EventResponse.Event.EventNumber)
+			//spew.Dump(ev.EventResponse.Event.EventNumber)
+			c.Assert(ev.EventResponse.Event.PrettyPrint(),
+				DeepEquals,
+				es[ev.Event.EventNumber].PrettyPrint())
+			count++
+		}
+	}
+}
+
+func (s *StreamSuite) TestReadStreamForwardAsyncWithVersionAndTake(c *C) {
+
+	stream := "SomeBigStream"
+	ne := 1000
+	es := createTestEvents(ne, stream, server.URL, "EventTypeY", "EventTypeZ")
+
+	setupSimulator(es, nil)
+
+	ver := &StreamVersion{55}
+	take := &Take{203}
+	eventsChannel := client.ReadStreamForwardAsync(stream, ver, take)
+	count := 0
+	var first *Event
+	var last *Event
+	for {
+		select {
+		case ev, open := <-eventsChannel:
+			if !open {
+				fmt.Println("Closed")
+				c.Assert(count, Equals, take.Number)
+				c.Assert(first.EventNumber, Equals, es[ver.Number].EventNumber)
+				c.Assert(last.EventNumber, DeepEquals, es[take.Number].EventNumber+ver.Number-1)
+				return
+			}
+
+			if first == nil {
+				first = ev.EventResponse.Event
+			}
+
+			last = ev.EventResponse.Event
+
+			c.Assert(ev.error, IsNil)
+			//fmt.Println(ev.EventResponse.Event.EventNumber)
+			//spew.Dump(ev.EventResponse.Event.EventNumber)
+			c.Assert(ev.EventResponse.Event.PrettyPrint(),
+				DeepEquals,
+				es[ev.Event.EventNumber].PrettyPrint())
+			count++
+		}
 	}
 }
 
