@@ -52,7 +52,7 @@ func setup() {
 
 func setupSimulator(es []*Event, m *Event) {
 	u, _ := url.Parse(server.URL)
-	handler := ESHandler{Events: es, BaseURL: u, MetaData: m}
+	handler := ESAtomFeedSimulator{Events: es, BaseURL: u, MetaData: m}
 	mux.Handle("/", handler)
 }
 

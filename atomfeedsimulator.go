@@ -30,13 +30,13 @@ type esRequest struct {
 	PageSize  int
 }
 
-type ESHandler struct {
+type ESAtomFeedSimulator struct {
 	Events   []*Event
 	BaseURL  *url.URL
 	MetaData *Event
 }
 
-func (h ESHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h ESAtomFeedSimulator) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	ru := r.URL
 	if !ru.IsAbs() {
