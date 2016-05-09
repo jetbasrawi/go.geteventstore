@@ -32,8 +32,21 @@ type StreamReader interface {
 	ReadStreamBackward(string, *StreamVersion, *Take) ([]*EventResponse, *Response, error)
 }
 
+type StreamReaderAsync interface {
+	ReadStreamForwardAsync(string, *StreamVersion, *Take) <-chan struct {
+		*EventResponse
+		*Response
+		error
+	}
+	ReadStreamBackwardAsync(string, *StreamVersion, *Take) <-chan struct {
+		*EventResponse
+		*Response
+		error
+	}
+}
+
 type EventBuilder interface {
-	ToEventData(string, string, interface{}, interface{})
+	ToEventData(string, string, interface{}, interface{}) *Event
 }
 
 type EventReader interface {

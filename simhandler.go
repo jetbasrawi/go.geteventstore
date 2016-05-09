@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -51,7 +52,7 @@ func (h ESHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if fr.MatchString(ru.String()) {
 		//fmt.Printf("\nHandling URL: %s\n", r.URL.String())
-		f, err := createTestFeed(h.Events, ru.String())
+		f, err := CreateTestFeed(h.Events, ru.String())
 		if err != nil {
 			if serr, ok := err.(invalidVersionError); ok {
 				http.Error(w, serr.Error(), http.StatusBadRequest)
@@ -76,7 +77,7 @@ func (h ESHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
 		}
-		er, err := createTestEventAtomResponse(e, nil)
+		er, err := CreateTestEventAtomResponse(e, nil)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -95,7 +96,7 @@ func (h ESHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprint(w, "{}")
 			return
 		}
-		m, err := createTestEventAtomResponse(h.MetaData, nil)
+		m, err := CreateTestEventAtomResponse(h.MetaData, nil)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -104,22 +105,116 @@ func (h ESHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func resolveEvent(events []*Event, url string) (*Event, error) {
+func CreateTestFeed(es []*Event, feedURL string) (*atom.Feed, error) {
 
-	r, err := regexp.Compile("\\d+$")
+	r, err := parseURL(feedURL)
 	if err != nil {
 		return nil, err
 	}
 
-	str := r.FindString(strings.TrimRight(url, "/"))
-	i, err := strconv.ParseInt(str, 0, 0)
-	if err != nil {
-		return nil, err
+	var prevVersion int
+	var nextVersion int
+	var lastVersion int
+
+	s, _, isLast := getSliceSection(es, r.Version, r.PageSize, r.Direction)
+	sr := reverseEventSlice(s)
+
+	lastVersion = es[0].EventNumber
+
+	if len(s) > 0 {
+		nextVersion = s[0].EventNumber - 1
+		prevVersion = sr[0].EventNumber + 1
+	} else {
+		nextVersion = es[len(es)-1].EventNumber
+		prevVersion = -1
 	}
-	return events[i], nil
+
+	f := &atom.Feed{}
+
+	f.Title = fmt.Sprintf("Event stream '%s'", r.Stream)
+	f.Updated = atom.Time(time.Now())
+	f.Author = &atom.Person{Name: "EventStore"}
+
+	u := fmt.Sprintf("%s/streams/%s", r.Host, r.Stream)
+	l := []atom.Link{}
+	l = append(l, atom.Link{Href: u, Rel: "self"})
+	l = append(l, atom.Link{Href: fmt.Sprintf("%s/head/backward/%d", u, r.PageSize), Rel: "first"})
+
+	if !isLast { // On every page except last page
+		l = append(l, atom.Link{Href: fmt.Sprintf("%s/%d/forward/%d", u, lastVersion, r.PageSize), Rel: "last"})
+		l = append(l, atom.Link{Href: fmt.Sprintf("%s/%d/backward/%d", u, nextVersion, r.PageSize), Rel: "next"})
+	}
+
+	if prevVersion >= 0 {
+		l = append(l, atom.Link{Href: fmt.Sprintf("%s/%d/forward/%d", u, prevVersion, r.PageSize), Rel: "previous"})
+	}
+	l = append(l, atom.Link{Href: fmt.Sprintf("%s/metadata", u), Rel: "metadata"})
+	f.Link = l
+
+	for _, v := range sr {
+		e := &atom.Entry{}
+		e.Title = fmt.Sprintf("%d@%s", v.EventNumber, r.Stream)
+		e.ID = v.EventStreamID
+		e.Updated = atom.Time(time.Now())
+		e.Author = &atom.Person{Name: "EventStore"}
+		e.Summary = &atom.Text{Body: v.EventType}
+		e.Link = append(e.Link, atom.Link{Rel: "edit", Href: v.Links[0].URI})
+		e.Link = append(e.Link, atom.Link{Rel: "alternate", Href: v.Links[0].URI})
+		f.Entry = append(f.Entry, e)
+	}
+
+	return f, nil
 }
 
-func createTestEventResponse(e *Event, tm *TimeStr) (*EventResponse, error) {
+func CreateTestEvent(stream, server, eventType string, eventNumber int, data *json.RawMessage, meta *json.RawMessage) *Event {
+	e := Event{}
+	e.EventStreamID = stream
+	e.EventNumber = eventNumber
+	e.EventType = eventType
+
+	uuid, _ := NewUUID()
+	e.EventID = uuid
+
+	e.Data = data
+
+	u := fmt.Sprintf("%s/streams/%s", server, stream)
+	eu := fmt.Sprintf("%s/%d/", u, eventNumber)
+	l1 := Link{URI: eu, Relation: "edit"}
+	l2 := Link{URI: eu, Relation: "alternate"}
+	ls := []Link{l1, l2}
+	e.Links = ls
+
+	if meta != nil {
+		e.MetaData = meta
+	} else {
+		m := "\"\""
+		mraw := json.RawMessage(m)
+		e.MetaData = &mraw
+	}
+	return &e
+}
+
+func CreateTestEvents(numEvents int, stream string, server string, eventTypes ...string) []*Event {
+	se := []*Event{}
+	for i := 0; i < numEvents; i++ {
+		r := rand.Intn(len(eventTypes))
+		eventType := eventTypes[r]
+
+		uuid, _ := NewUUID()
+		d := fmt.Sprintf("{ \"foo\" : \"%s\" }", uuid)
+		raw := json.RawMessage(d)
+
+		m := fmt.Sprintf("{\"bar\": \"%s\"}", uuid)
+		mraw := json.RawMessage(m)
+
+		e := CreateTestEvent(stream, server, eventType, i, &raw, &mraw)
+
+		se = append(se, e)
+	}
+	return se
+}
+
+func CreateTestEventResponse(e *Event, tm *TimeStr) (*EventResponse, error) {
 
 	timeStr := Time(time.Now())
 	if tm != nil {
@@ -137,7 +232,7 @@ func createTestEventResponse(e *Event, tm *TimeStr) (*EventResponse, error) {
 	return r, nil
 }
 
-func createTestEventAtomResponse(e *Event, tm *TimeStr) (*eventAtomResponse, error) {
+func CreateTestEventAtomResponse(e *Event, tm *TimeStr) (*eventAtomResponse, error) {
 
 	b, err := json.Marshal(e)
 	if err != nil {
@@ -164,7 +259,7 @@ func createTestEventAtomResponse(e *Event, tm *TimeStr) (*eventAtomResponse, err
 func getSliceSection(es []*Event, ver *StreamVersion, pageSize int, direction string) ([]*Event, bool, bool) {
 
 	if len(es) < 1 {
-		//TODO
+		return []*Event{}, false, false
 	}
 
 	if ver != nil && ver.Number < 0 {
@@ -263,63 +358,17 @@ func reverseEventSlice(s []*Event) []*Event {
 	return r
 }
 
-func createTestFeed(es []*Event, feedURL string) (*atom.Feed, error) {
+func resolveEvent(events []*Event, url string) (*Event, error) {
 
-	r, err := parseURL(feedURL)
+	r, err := regexp.Compile("\\d+$")
 	if err != nil {
 		return nil, err
 	}
 
-	var prevVersion int
-	var nextVersion int
-	var lastVersion int
-
-	s, _, isLast := getSliceSection(es, r.Version, r.PageSize, r.Direction)
-	sr := reverseEventSlice(s)
-
-	lastVersion = es[0].EventNumber
-
-	if len(s) > 0 {
-		nextVersion = s[0].EventNumber - 1
-		prevVersion = sr[0].EventNumber + 1
-	} else {
-		nextVersion = es[len(es)-1].EventNumber
-		prevVersion = -1
+	str := r.FindString(strings.TrimRight(url, "/"))
+	i, err := strconv.ParseInt(str, 0, 0)
+	if err != nil {
+		return nil, err
 	}
-
-	f := &atom.Feed{}
-
-	f.Title = fmt.Sprintf("Event stream '%s'", r.Stream)
-	f.Updated = atom.Time(time.Now())
-	f.Author = &atom.Person{Name: "EventStore"}
-
-	u := fmt.Sprintf("%s/streams/%s", r.Host, r.Stream)
-	l := []atom.Link{}
-	l = append(l, atom.Link{Href: u, Rel: "self"})
-	l = append(l, atom.Link{Href: fmt.Sprintf("%s/head/backward/%d", u, r.PageSize), Rel: "first"})
-
-	if !isLast { // On every page except last page
-		l = append(l, atom.Link{Href: fmt.Sprintf("%s/%d/forward/%d", u, lastVersion, r.PageSize), Rel: "last"})
-		l = append(l, atom.Link{Href: fmt.Sprintf("%s/%d/backward/%d", u, nextVersion, r.PageSize), Rel: "next"})
-	}
-
-	if prevVersion >= 0 {
-		l = append(l, atom.Link{Href: fmt.Sprintf("%s/%d/forward/%d", u, prevVersion, r.PageSize), Rel: "previous"})
-	}
-	l = append(l, atom.Link{Href: fmt.Sprintf("%s/metadata", u), Rel: "metadata"})
-	f.Link = l
-
-	for _, v := range sr {
-		e := &atom.Entry{}
-		e.Title = fmt.Sprintf("%d@%s", v.EventNumber, r.Stream)
-		e.ID = v.EventStreamID
-		e.Updated = atom.Time(time.Now())
-		e.Author = &atom.Person{Name: "EventStore"}
-		e.Summary = &atom.Text{Body: v.EventType}
-		e.Link = append(e.Link, atom.Link{Rel: "edit", Href: v.Links[0].URI})
-		e.Link = append(e.Link, atom.Link{Rel: "alternate", Href: v.Links[0].URI})
-		f.Entry = append(f.Entry, e)
-	}
-
-	return f, nil
+	return events[i], nil
 }

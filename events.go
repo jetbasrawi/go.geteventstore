@@ -102,19 +102,14 @@ func Time(t time.Time) TimeStr {
 // If an empty eventId is provided an eventId will be generated
 // and retured in the event.
 func (c *Client) ToEventData(eventId, eventType string, data interface{}, meta interface{}) *Event {
-
 	e := &Event{EventType: eventType}
-
 	if eventId == "" {
 		e.EventID, _ = NewUUID()
 	} else {
 		e.EventID = eventId
 	}
-
 	e.Data = data
-
 	e.MetaData = meta
-
 	return e
 }
 
@@ -127,9 +122,7 @@ func (c *Client) ToEventData(eventId, eventType string, data interface{}, meta i
 // as the error. The *ErrorResponse will contain the raw http response and status
 // and a description of the error.
 func (c *Client) GetEvents(urls []string) ([]*EventResponse, *Response, error) {
-
 	s := make([]*EventResponse, len(urls))
-
 	for i := 0; i < len(urls); i++ {
 		e, resp, err := c.GetEvent(urls[i])
 		if err != nil {

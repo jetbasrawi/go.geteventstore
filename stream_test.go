@@ -35,8 +35,8 @@ func (s *StreamSuite) TestGetAtomPage(c *C) {
 	path := fmt.Sprintf("/streams/%s/head/backward/20", stream)
 	url := fmt.Sprintf("%s%s", server.URL, path)
 
-	es := createTestEvents(2, stream, server.URL, "EventTypeX")
-	f, _ := createTestFeed(es, url)
+	es := CreateTestEvents(2, stream, server.URL, "EventTypeX")
+	f, _ := CreateTestFeed(es, url)
 
 	mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
 		c.Assert(r.Method, Equals, "GET")
@@ -53,10 +53,10 @@ func (s *StreamSuite) TestUnmarshalFeed(c *C) {
 	stream := "unmarshal-feed"
 	count := 2
 
-	es := createTestEvents(count, stream, server.URL, "EventTypeX")
+	es := CreateTestEvents(count, stream, server.URL, "EventTypeX")
 	url := fmt.Sprintf("%s/streams/%s/head/backward/%d", server.URL, stream, count)
 
-	wf, _ := createTestFeed(es, url)
+	wf, _ := CreateTestFeed(es, url)
 	want := wf.PrettyPrint()
 
 	gf, err := unmarshalFeed(strings.NewReader(want))
@@ -68,7 +68,7 @@ func (s *StreamSuite) TestUnmarshalFeed(c *C) {
 
 func (s *StreamSuite) TestRunServer(c *C) {
 	stream := "astream"
-	es := createTestEvents(100, stream, server.URL, "EventTypeA", "EventTypeB")
+	es := CreateTestEvents(100, stream, server.URL, "EventTypeA", "EventTypeB")
 
 	setupSimulator(es, nil)
 
@@ -91,7 +91,7 @@ func (s *StreamSuite) TestReadFeedBackwardError(c *C) {
 func (s *StreamSuite) TestReadFeedBackwardFromVersionAll(c *C) {
 	stream := "ABigStream"
 	ne := 1000
-	es := createTestEvents(ne, stream, server.URL, "EventTypeX")
+	es := CreateTestEvents(ne, stream, server.URL, "EventTypeX")
 
 	setupSimulator(es, nil)
 
@@ -112,7 +112,7 @@ func (s *StreamSuite) TestReadFeedBackwardFromVersionAll(c *C) {
 func (s *StreamSuite) TestReadFeedBackwardAll(c *C) {
 	stream := "ABigStream"
 	ne := 1000
-	es := createTestEvents(ne, stream, server.URL, "EventTypeX")
+	es := CreateTestEvents(ne, stream, server.URL, "EventTypeX")
 
 	setupSimulator(es, nil)
 
@@ -142,7 +142,7 @@ func (s *StreamSuite) TestReadFeedForwardError(c *C) {
 func (s *StreamSuite) TestReadFeedBackwardFromVersionWithTake(c *C) {
 	stream := "ABigStream"
 	ne := 1000
-	es := createTestEvents(ne, stream, server.URL, "EventTypeX")
+	es := CreateTestEvents(ne, stream, server.URL, "EventTypeX")
 
 	setupSimulator(es, nil)
 
@@ -166,7 +166,7 @@ func (s *StreamSuite) TestReadFeedBackwardFromVersionWithTake(c *C) {
 func (s *StreamSuite) TestReadFeedBackwardFromVersionWithTakeOutOfRangeUnder(c *C) {
 	stream := "ABigStream"
 	ne := 1000
-	es := createTestEvents(ne, stream, server.URL, "EventTypeX")
+	es := CreateTestEvents(ne, stream, server.URL, "EventTypeX")
 
 	setupSimulator(es, nil)
 
@@ -193,7 +193,7 @@ func (s *StreamSuite) TestReadFeedBackwardFromVersionWithTakeOutOfRangeUnder(c *
 func (s *StreamSuite) TestReadFeedForwardTail(c *C) {
 	stream := "ABigStream"
 	ne := 1000
-	es := createTestEvents(ne, stream, server.URL, "EventTypeX")
+	es := CreateTestEvents(ne, stream, server.URL, "EventTypeX")
 	setupSimulator(es, nil)
 	ver := &StreamVersion{Number: 1000}
 
@@ -214,7 +214,7 @@ func (s *StreamSuite) TestGetFeedURLInvalidVersion(c *C) {
 func (s *StreamSuite) TestReadFeedForwardAll(c *C) {
 	stream := "ABigStream"
 	ne := 1000
-	es := createTestEvents(ne, stream, server.URL, "EventTypeX")
+	es := CreateTestEvents(ne, stream, server.URL, "EventTypeX")
 
 	setupSimulator(es, nil)
 
@@ -232,7 +232,7 @@ func (s *StreamSuite) TestReadStreamForwardAsync(c *C) {
 
 	stream := "SomeBigStream"
 	ne := 1000
-	es := createTestEvents(ne, stream, server.URL, "EventTypeY", "EventTypeZ")
+	es := CreateTestEvents(ne, stream, server.URL, "EventTypeY", "EventTypeZ")
 
 	setupSimulator(es, nil)
 
@@ -260,7 +260,7 @@ func (s *StreamSuite) TestReadStreamBackwardAsync(c *C) {
 
 	stream := "SomeBigStream"
 	ne := rand.Intn(550)
-	es := createTestEvents(ne, stream, server.URL, "EventTypeY", "EventTypeZ")
+	es := CreateTestEvents(ne, stream, server.URL, "EventTypeY", "EventTypeZ")
 
 	setupSimulator(es, nil)
 
@@ -286,7 +286,7 @@ func (s *StreamSuite) TestReadStreamForwardAsyncWithVersion(c *C) {
 
 	stream := "SomeBigStream"
 	ne := rand.Intn(550)
-	es := createTestEvents(ne, stream, server.URL, "EventTypeY", "EventTypeZ")
+	es := CreateTestEvents(ne, stream, server.URL, "EventTypeY", "EventTypeZ")
 
 	setupSimulator(es, nil)
 
@@ -324,7 +324,7 @@ func (s *StreamSuite) TestReadStreamBackwardAsyncWithVersion(c *C) {
 
 	stream := "SomeBigStream"
 	ne := rand.Intn(550)
-	es := createTestEvents(ne, stream, server.URL, "EventTypeY", "EventTypeZ")
+	es := CreateTestEvents(ne, stream, server.URL, "EventTypeY", "EventTypeZ")
 
 	setupSimulator(es, nil)
 
@@ -362,7 +362,7 @@ func (s *StreamSuite) TestReadStreamForwardAsyncWithVersionAndTake(c *C) {
 
 	stream := "SomeBigStream"
 	ne := rand.Intn(550)
-	es := createTestEvents(ne, stream, server.URL, "EventTypeY", "EventTypeZ")
+	es := CreateTestEvents(ne, stream, server.URL, "EventTypeY", "EventTypeZ")
 
 	setupSimulator(es, nil)
 
@@ -401,7 +401,7 @@ func (s *StreamSuite) TestReadStreamBackwardAsyncWithVersionAndTake(c *C) {
 
 	stream := "SomeBigStream"
 	ne := 550
-	es := createTestEvents(ne, stream, server.URL, "EventTypeY", "EventTypeZ")
+	es := CreateTestEvents(ne, stream, server.URL, "EventTypeY", "EventTypeZ")
 
 	setupSimulator(es, nil)
 
@@ -426,8 +426,6 @@ func (s *StreamSuite) TestReadStreamBackwardAsyncWithVersionAndTake(c *C) {
 			}
 
 			last = ev.EventResponse.Event
-
-			fmt.Printf("Back %d\n", ev.Event.EventNumber)
 			c.Assert(ev.error, IsNil)
 			c.Assert(ev.EventResponse.Event.PrettyPrint(),
 				DeepEquals,
@@ -475,7 +473,7 @@ func (s *StreamSuite) TestGetFeedURLForwardVersioned(c *C) {
 
 func (s *StreamSuite) TestGetMetaReturnsNilWhenStreamMetaDataIsEmpty(c *C) {
 	stream := "Some-Stream"
-	es := createTestEvents(10, stream, server.URL, "EventTypeX")
+	es := CreateTestEvents(10, stream, server.URL, "EventTypeX")
 	setupSimulator(es, nil)
 
 	got, resp, err := client.GetStreamMetaData(stream)
@@ -489,9 +487,9 @@ func (s *StreamSuite) TestGetMetaData(c *C) {
 	d := fmt.Sprintf("{ \"foo\" : %d }", rand.Intn(9999))
 	raw := json.RawMessage(d)
 	stream := "Some-Stream"
-	es := createTestEvents(10, stream, server.URL, "EventTypeX")
-	m := createTestEvent(stream, server.URL, "metadata", 10, &raw, nil)
-	want, _ := createTestEventResponse(m, nil)
+	es := CreateTestEvents(10, stream, server.URL, "EventTypeX")
+	m := CreateTestEvent(stream, server.URL, "metadata", 10, &raw, nil)
+	want, _ := CreateTestEventResponse(m, nil)
 	setupSimulator(es, m)
 
 	got, _, _ := client.GetStreamMetaData(stream)
@@ -509,8 +507,8 @@ func (s *StreamSuite) TestAppendStreamMetadata(c *C) {
 	fURL := fmt.Sprintf("/streams/%s/head/backward/100", stream)
 	fullURL := fmt.Sprintf("%s%s", server.URL, fURL)
 	mux.HandleFunc(fURL, func(w http.ResponseWriter, r *http.Request) {
-		es := createTestEvents(1, stream, server.URL, eventType)
-		f, _ := createTestFeed(es, fullURL)
+		es := CreateTestEvents(1, stream, server.URL, eventType)
+		f, _ := CreateTestFeed(es, fullURL)
 		fmt.Fprint(w, f.PrettyPrint())
 	})
 

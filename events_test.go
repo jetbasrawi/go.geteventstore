@@ -10,7 +10,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"math/rand"
 	"net/http"
 	"strconv"
 	"time"
@@ -146,12 +145,12 @@ func (s *EventSuite) TestAppendEventsWithExpectedVersion(c *C) {
 
 func (s *EventSuite) TestGetEvent(c *C) {
 	stream := "GetEventStream"
-	es := createTestEvents(1, stream, server.URL, "SomeEventType")
+	es := CreateTestEvents(1, stream, server.URL, "SomeEventType")
 	ti := Time(time.Now())
 
-	want, _ := createTestEventResponse(es[0], &ti)
+	want, _ := CreateTestEventResponse(es[0], &ti)
 
-	er, _ := createTestEventAtomResponse(es[0], &ti)
+	er, _ := CreateTestEventAtomResponse(es[0], &ti)
 	str := er.PrettyPrint()
 
 	mux.HandleFunc("/streams/some-stream/299", func(w http.ResponseWriter, r *http.Request) {
@@ -168,8 +167,8 @@ func (s *EventSuite) TestGetEvent(c *C) {
 }
 
 func (s *EventSuite) TestGetEventURLs(c *C) {
-	es := createTestEvents(2, "some-stream", "http://localhost:2113", "EventTypeX")
-	f, _ := createTestFeed(es, "http://localhost:2113/streams/some-stream/head/backward/2")
+	es := CreateTestEvents(2, "some-stream", "http://localhost:2113", "EventTypeX")
+	f, _ := CreateTestFeed(es, "http://localhost:2113/streams/some-stream/head/backward/2")
 
 	got, err := getEventURLs(f)
 	c.Assert(err, IsNil)
@@ -178,52 +177,4 @@ func (s *EventSuite) TestGetEventURLs(c *C) {
 		"http://localhost:2113/streams/some-stream/0",
 	}
 	c.Assert(got, DeepEquals, want)
-}
-
-func createTestEvent(stream, server, eventType string, eventNumber int, data *json.RawMessage, meta *json.RawMessage) *Event {
-	e := Event{}
-	e.EventStreamID = stream
-	e.EventNumber = eventNumber
-	e.EventType = eventType
-
-	uuid, _ := NewUUID()
-	e.EventID = uuid
-
-	e.Data = data
-
-	u := fmt.Sprintf("%s/streams/%s", server, stream)
-	eu := fmt.Sprintf("%s/%d/", u, eventNumber)
-	l1 := Link{URI: eu, Relation: "edit"}
-	l2 := Link{URI: eu, Relation: "alternate"}
-	ls := []Link{l1, l2}
-	e.Links = ls
-
-	if meta != nil {
-		e.MetaData = meta
-	} else {
-		m := "\"\""
-		mraw := json.RawMessage(m)
-		e.MetaData = &mraw
-	}
-	return &e
-}
-
-func createTestEvents(numEvents int, stream string, server string, eventTypes ...string) []*Event {
-	se := []*Event{}
-	for i := 0; i < numEvents; i++ {
-		r := rand.Intn(len(eventTypes))
-		eventType := eventTypes[r]
-
-		d := fmt.Sprintf("{ \"foo\" : %d }", rand.Intn(9999))
-		raw := json.RawMessage(d)
-
-		uuid, _ := NewUUID()
-		m := fmt.Sprintf("{\"bar\": \"%s\"}", uuid)
-		mraw := json.RawMessage(m)
-
-		e := createTestEvent(stream, server, eventType, i, &raw, &mraw)
-
-		se = append(se, e)
-	}
-	return se
 }

@@ -74,7 +74,6 @@ func (s *GoesSuite) TestNewRequest(c *C) {
 	client, _ := NewClient(nil, defaultBaseURL)
 	inURL, outURL := "/foo", defaultBaseURL+"foo"
 	inBody := &Event{EventID: "some-uuid", EventType: "SomeEventType", Data: "some-string"}
-	//eventStructJSON := `{"eventNumber":0,"eventType":"SomeEventType","eventId":"some-uuid","data":"some-string"}`
 	eventStructJSON := `{"eventType":"SomeEventType","eventId":"some-uuid","data":"some-string"}`
 	outBody := eventStructJSON + "\n"
 	req, _ := client.newRequest("GET", inURL, inBody)
@@ -123,7 +122,7 @@ func (s *GoesSuite) TestNewRequestWithEmptyBody(c *C) {
 
 func (s *GoesSuite) TestDo(c *C) {
 
-	te := createTestEvents(1, "some-stream", "localhost:2113", "SomeEventType")
+	te := CreateTestEvents(1, "some-stream", "localhost:2113", "SomeEventType")
 	body := te[0].Data
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
