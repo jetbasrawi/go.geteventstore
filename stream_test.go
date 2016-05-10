@@ -489,7 +489,7 @@ func (s *StreamSuite) TestGetMetaData(c *C) {
 	stream := "Some-Stream"
 	es := CreateTestEvents(10, stream, server.URL, "EventTypeX")
 	m := CreateTestEvent(stream, server.URL, "metadata", 10, &raw, nil)
-	want, _ := CreateTestEventResponse(m, nil)
+	want := CreateTestEventResponse(m, nil)
 	setupSimulator(es, m)
 
 	got, _, _ := client.GetStreamMetaData(stream)

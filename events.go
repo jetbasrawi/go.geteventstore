@@ -101,7 +101,7 @@ func Time(t time.Time) TimeStr {
 //
 // If an empty eventId is provided an eventId will be generated
 // and retured in the event.
-func (c *Client) ToEventData(eventId, eventType string, data interface{}, meta interface{}) *Event {
+func ToEventData(eventId, eventType string, data interface{}, meta interface{}) *Event {
 	e := &Event{EventType: eventType}
 	if eventId == "" {
 		e.EventID, _ = NewUUID()

@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"net/http"
 	"net/url"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -166,6 +167,16 @@ func CreateTestFeed(es []*Event, feedURL string) (*atom.Feed, error) {
 	return f, nil
 }
 
+func CreateTestEventsFromData(data ...interface{}) []*Event {
+	ret := make([]*Event, len(data))
+	for k, v := range data {
+		tp := reflect.TypeOf(v).Elem().Name()
+		ev := ToEventData("", tp, v, nil)
+		ret[k] = ev
+	}
+	return ret
+}
+
 func CreateTestEvent(stream, server, eventType string, eventNumber int, data *json.RawMessage, meta *json.RawMessage) *Event {
 	e := Event{}
 	e.EventStreamID = stream
@@ -214,7 +225,7 @@ func CreateTestEvents(numEvents int, stream string, server string, eventTypes ..
 	return se
 }
 
-func CreateTestEventResponse(e *Event, tm *TimeStr) (*EventResponse, error) {
+func CreateTestEventResponse(e *Event, tm *TimeStr) *EventResponse {
 
 	timeStr := Time(time.Now())
 	if tm != nil {
@@ -229,7 +240,15 @@ func CreateTestEventResponse(e *Event, tm *TimeStr) (*EventResponse, error) {
 		Event:   e,
 	}
 
-	return r, nil
+	return r
+}
+
+func CreateTestEventResponses(events []*Event, tm *TimeStr) []*EventResponse {
+	ret := make([]*EventResponse, len(events))
+	for k, v := range events {
+		ret[k] = CreateTestEventResponse(v, tm)
+	}
+	return ret
 }
 
 func CreateTestEventAtomResponse(e *Event, tm *TimeStr) (*eventAtomResponse, error) {

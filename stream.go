@@ -77,7 +77,7 @@ func (c *Client) AppendToStream(streamName string, expectedVersion *StreamVersio
 // http://docs.geteventstore.com/http-api/3.6.0/stream-metadata/
 func (c *Client) UpdateStreamMetaData(stream string, metadata interface{}) (*Response, error) {
 
-	m := c.ToEventData("", "MetaData", metadata, nil)
+	m := ToEventData("", "MetaData", metadata, nil)
 	mURL, resp, err := c.getMetadataURL(stream)
 	if err != nil {
 		return resp, err

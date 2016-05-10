@@ -45,7 +45,7 @@ func (s *EventSuite) TestNewEvent(c *C) {
 	meta := &MyMetaDataType{MetaField1: 1010, MetaField2: "Some meta string"}
 	want := &Event{EventID: uuid, EventType: eventType, Data: data, MetaData: meta}
 
-	got := client.ToEventData(uuid, eventType, data, meta)
+	got := ToEventData(uuid, eventType, data, meta)
 
 	c.Assert(got, DeepEquals, want)
 }
@@ -53,7 +53,7 @@ func (s *EventSuite) TestNewEvent(c *C) {
 func (s *EventSuite) TestAppendEventsSingle(c *C) {
 	data := &MyDataType{Field1: 445, Field2: "Some string"}
 	et := "SomeEventType"
-	ev := client.ToEventData("", et, data, nil)
+	ev := ToEventData("", et, data, nil)
 	stream := "Some-Stream"
 	url := fmt.Sprintf("/streams/%s", stream)
 	mux.HandleFunc(url, func(w http.ResponseWriter, r *http.Request) {
@@ -85,8 +85,8 @@ func (s *EventSuite) TestAppendEventsMultiple(c *C) {
 	et := "SomeEventType"
 	d1 := &MyDataType{Field1: 445, Field2: "Some string"}
 	d2 := &MyDataType{Field1: 446, Field2: "Some other string"}
-	ev1 := client.ToEventData("", et, d1, nil)
-	ev2 := client.ToEventData("", et, d2, nil)
+	ev1 := ToEventData("", et, d1, nil)
+	ev2 := ToEventData("", et, d2, nil)
 
 	stream := "Some-Stream"
 	url := fmt.Sprintf("/streams/%s", stream)
@@ -119,7 +119,7 @@ func (s *EventSuite) TestAppendEventsMultiple(c *C) {
 func (s *EventSuite) TestAppendEventsWithExpectedVersion(c *C) {
 	data := &MyDataType{Field1: 445, Field2: "Some string"}
 	et := "SomeEventType"
-	ev := client.ToEventData("", et, data, nil)
+	ev := ToEventData("", et, data, nil)
 
 	stream := "Some-Stream"
 	url := fmt.Sprintf("/streams/%s", stream)
@@ -148,7 +148,7 @@ func (s *EventSuite) TestGetEvent(c *C) {
 	es := CreateTestEvents(1, stream, server.URL, "SomeEventType")
 	ti := Time(time.Now())
 
-	want, _ := CreateTestEventResponse(es[0], &ti)
+	want := CreateTestEventResponse(es[0], &ti)
 
 	er, _ := CreateTestEventAtomResponse(es[0], &ti)
 	str := er.PrettyPrint()

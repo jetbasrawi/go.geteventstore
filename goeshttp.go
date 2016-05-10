@@ -15,34 +15,44 @@ import (
 	"net/url"
 )
 
-type StreamAppender interface {
-	AppendToStream(string, *StreamVersion, ...*Event) (*Response, error)
-}
+//type StreamAppender interface {
+//AppendToStream(string, *StreamVersion, ...*Event) (*Response, error)
+//}
 
-type MetaDataUpdater interface {
-	UpdateStreamMetaData(string, interface{}) (*Response, error)
-}
+//type MetaDataUpdater interface {
+//UpdateStreamMetaData(string, interface{}) (*Response, error)
+//}
 
-type MetaDataReader interface {
-	GetStreamMetaData(string) (*EventResponse, *Response, error)
-}
+//type MetaDataReader interface {
+//GetStreamMetaData(string) (*EventResponse, *Response, error)
+//}
 
-type StreamReader interface {
-	ReadStreamForward(string, *StreamVersion, *Take) ([]*EventResponse, *Response, error)
-	ReadStreamBackward(string, *StreamVersion, *Take) ([]*EventResponse, *Response, error)
-}
+//type StreamReader interface {
+//ReadStreamForward(string, *StreamVersion, *Take) ([]*EventResponse, *Response, error)
+//ReadStreamBackward(string, *StreamVersion, *Take) ([]*EventResponse, *Response, error)
+//}
 
-type StreamReaderAsync interface {
+//type StreamReaderAsync interface {
+//ReadStreamForwardAsync(string, *StreamVersion, *Take) <-chan struct {
+//*EventResponse
+//*Response
+//error
+//}
+//ReadStreamBackwardAsync(string, *StreamVersion, *Take) <-chan struct {
+//*EventResponse
+//*Response
+//error
+//}
+//}
+
+type GetEventStoreRepositoryClient interface {
 	ReadStreamForwardAsync(string, *StreamVersion, *Take) <-chan struct {
 		*EventResponse
 		*Response
 		error
 	}
-	ReadStreamBackwardAsync(string, *StreamVersion, *Take) <-chan struct {
-		*EventResponse
-		*Response
-		error
-	}
+
+	AppendToStream(string, *StreamVersion, ...*Event) (*Response, error)
 }
 
 type EventBuilder interface {
