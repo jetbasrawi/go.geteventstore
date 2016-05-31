@@ -167,16 +167,39 @@ func CreateTestFeed(es []*Event, feedURL string) (*atom.Feed, error) {
 	return f, nil
 }
 
-func CreateTestEventsFromData(data ...interface{}) []*Event {
-	ret := make([]*Event, len(data))
-	for k, v := range data {
-		tp := reflect.TypeOf(v).Elem().Name()
-		ev := ToEventData("", tp, v, nil)
-		ret[k] = ev
-	}
-	return ret
-}
+func CreateTestEventFromData(stream, server string, eventNumber int, data interface{}, meta interface{}) *Event {
+	e := Event{}
+	e.EventStreamID = stream
+	e.EventNumber = eventNumber
+	e.EventType = reflect.TypeOf(data).Elem().Name()
 
+	uuid, _ := NewUUID()
+	e.EventID = uuid
+
+	b, _ := json.Marshal(data)
+	var d json.RawMessage
+	d = json.RawMessage(b)
+	e.Data = &d
+
+	u := fmt.Sprintf("%s/streams/%s", server, stream)
+	eu := fmt.Sprintf("%s/%d/", u, eventNumber)
+	l1 := Link{URI: eu, Relation: "edit"}
+	l2 := Link{URI: eu, Relation: "alternate"}
+	ls := []Link{l1, l2}
+	e.Links = ls
+
+	if meta != nil {
+		mb, _ := json.Marshal(meta)
+		var m json.RawMessage
+		m = json.RawMessage(mb)
+		e.MetaData = &m
+	} else {
+		m := "\"\""
+		mraw := json.RawMessage(m)
+		e.MetaData = &mraw
+	}
+	return &e
+}
 func CreateTestEvent(stream, server, eventType string, eventNumber int, data *json.RawMessage, meta *json.RawMessage) *Event {
 	e := Event{}
 	e.EventStreamID = stream

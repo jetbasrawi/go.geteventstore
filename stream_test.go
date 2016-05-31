@@ -246,10 +246,10 @@ func (s *StreamSuite) TestReadStreamForwardAsync(c *C) {
 				return
 			}
 
-			c.Assert(ev.error, IsNil)
-			c.Assert(ev.EventResponse.Event.PrettyPrint(),
+			c.Assert(ev.Err, IsNil)
+			c.Assert(ev.EventResp.Event.PrettyPrint(),
 				DeepEquals,
-				es[ev.Event.EventNumber].PrettyPrint())
+				es[ev.EventResp.Event.EventNumber].PrettyPrint())
 			count++
 
 		}
@@ -273,10 +273,10 @@ func (s *StreamSuite) TestReadStreamBackwardAsync(c *C) {
 				c.Assert(count, Equals, 0)
 				return
 			}
-			c.Assert(ev.error, IsNil)
-			c.Assert(ev.EventResponse.Event.PrettyPrint(),
+			c.Assert(ev.Err, IsNil)
+			c.Assert(ev.EventResp.Event.PrettyPrint(),
 				DeepEquals,
-				es[ev.Event.EventNumber].PrettyPrint())
+				es[ev.EventResp.Event.EventNumber].PrettyPrint())
 			count--
 		}
 	}
@@ -306,15 +306,15 @@ func (s *StreamSuite) TestReadStreamForwardAsyncWithVersion(c *C) {
 			}
 
 			if first == nil {
-				first = ev.EventResponse.Event
+				first = ev.EventResp.Event
 			}
 
-			last = ev.EventResponse.Event
+			last = ev.EventResp.Event
 
-			c.Assert(ev.error, IsNil)
-			c.Assert(ev.EventResponse.Event.PrettyPrint(),
+			c.Assert(ev.Err, IsNil)
+			c.Assert(ev.EventResp.Event.PrettyPrint(),
 				DeepEquals,
-				es[ev.Event.EventNumber].PrettyPrint())
+				es[ev.EventResp.Event.EventNumber].PrettyPrint())
 			count++
 		}
 	}
@@ -344,15 +344,15 @@ func (s *StreamSuite) TestReadStreamBackwardAsyncWithVersion(c *C) {
 			}
 
 			if first == nil {
-				first = ev.EventResponse.Event
+				first = ev.EventResp.Event
 			}
 
-			last = ev.EventResponse.Event
+			last = ev.EventResp.Event
 
-			c.Assert(ev.error, IsNil)
-			c.Assert(ev.EventResponse.Event.PrettyPrint(),
+			c.Assert(ev.Err, IsNil)
+			c.Assert(ev.EventResp.Event.PrettyPrint(),
 				DeepEquals,
-				es[ev.Event.EventNumber].PrettyPrint())
+				es[ev.EventResp.Event.EventNumber].PrettyPrint())
 			count++
 		}
 	}
@@ -383,15 +383,15 @@ func (s *StreamSuite) TestReadStreamForwardAsyncWithVersionAndTake(c *C) {
 			}
 
 			if first == nil {
-				first = ev.EventResponse.Event
+				first = ev.EventResp.Event
 			}
 
-			last = ev.EventResponse.Event
+			last = ev.EventResp.Event
 
-			c.Assert(ev.error, IsNil)
-			c.Assert(ev.EventResponse.Event.PrettyPrint(),
+			c.Assert(ev.Err, IsNil)
+			c.Assert(ev.EventResp.Event.PrettyPrint(),
 				DeepEquals,
-				es[ev.Event.EventNumber].PrettyPrint())
+				es[ev.EventResp.Event.EventNumber].PrettyPrint())
 			count++
 		}
 	}
@@ -422,14 +422,14 @@ func (s *StreamSuite) TestReadStreamBackwardAsyncWithVersionAndTake(c *C) {
 			}
 
 			if first == nil {
-				first = ev.EventResponse.Event
+				first = ev.EventResp.Event
 			}
 
-			last = ev.EventResponse.Event
-			c.Assert(ev.error, IsNil)
-			c.Assert(ev.EventResponse.Event.PrettyPrint(),
+			last = ev.EventResp.Event
+			c.Assert(ev.Err, IsNil)
+			c.Assert(ev.EventResp.Event.PrettyPrint(),
 				DeepEquals,
-				es[ev.Event.EventNumber].PrettyPrint())
+				es[ev.EventResp.Event.EventNumber].PrettyPrint())
 			count++
 		}
 	}

@@ -195,6 +195,87 @@ func (c *Client) ReadStreamForward(stream string, version *StreamVersion, take *
 	return e, nil, nil
 }
 
+// AsyncResponse is used to encapsulate the responses from the asynchronous
+// stream reading methods.
+type AsyncResponse struct {
+	EventResp *EventResponse
+	Resp      *Response
+	Err       error
+}
+
+func (c *Client) CatchUpSubcribe(stream string, version *StreamVersion, take *Take) <-chan *AsyncResponse {
+
+	eventsChannel := make(chan *AsyncResponse)
+
+	pauseTime := 0
+
+	go func() {
+		count := 0
+
+		url, err := getFeedURL(stream, "forward", version, take)
+		if err != nil {
+			eventsChannel <- &AsyncResponse{nil, nil, err}
+			close(eventsChannel)
+			return
+		}
+
+		for {
+
+			f, resp, err := c.readStream(url)
+			if err != nil {
+				eventsChannel <- &AsyncResponse{nil, resp, err}
+				close(eventsChannel)
+				return
+			}
+
+			u, err := getEventURLs(f)
+			if err != nil {
+				eventsChannel <- &AsyncResponse{nil, nil, err}
+				close(eventsChannel)
+				return
+			}
+
+			if len(u) <= 0 {
+				pauseTime = 500
+			}
+
+			var rev []string
+			for i := len(u) - 1; i >= 0; i-- {
+				rev = append(rev, u[i])
+			}
+
+			p := ""
+			for _, v := range f.Link {
+				if v.Rel == "previous" {
+					p = v.Href
+					break
+				}
+			}
+			url = p
+
+			for _, v := range rev {
+				e, resp, err := c.GetEvent(v)
+				if err != nil {
+					eventsChannel <- &AsyncResponse{nil, resp, err}
+					close(eventsChannel)
+					return
+				}
+				eventsChannel <- &AsyncResponse{e, resp, nil}
+
+				count++
+
+				//fmt.Printf("%d\n", count)
+				if take != nil && take.Number <= count {
+					close(eventsChannel)
+					return
+				}
+			}
+		}
+	}()
+
+	return eventsChannel
+}
+
 // ReadStreamForwardAsync returns a channel of struct containing an *EventResponse, a *Response and an error.
 //
 // If the version parameter is nil reading will begin from the start of the stream.
@@ -210,28 +291,16 @@ func (c *Client) ReadStreamForward(stream string, version *StreamVersion, take *
 // request, the http status code that was returned and the status message.
 // An *ErrorResponse will also be returned and this will contain the raw http
 // response and status and a description of the error.
-func (c *Client) ReadStreamForwardAsync(stream string, version *StreamVersion, take *Take) <-chan struct {
-	*EventResponse
-	*Response
-	error
-} {
+func (c *Client) ReadStreamForwardAsync(stream string, version *StreamVersion, take *Take) <-chan *AsyncResponse {
 
-	eventsChannel := make(chan struct {
-		*EventResponse
-		*Response
-		error
-	})
+	eventsChannel := make(chan *AsyncResponse, 10000)
 
 	go func() {
 		count := 0
 
 		url, err := getFeedURL(stream, "forward", version, take)
 		if err != nil {
-			eventsChannel <- struct {
-				*EventResponse
-				*Response
-				error
-			}{nil, nil, err}
+			eventsChannel <- &AsyncResponse{nil, nil, err}
 			close(eventsChannel)
 			return
 		}
@@ -240,22 +309,14 @@ func (c *Client) ReadStreamForwardAsync(stream string, version *StreamVersion, t
 
 			f, resp, err := c.readStream(url)
 			if err != nil {
-				eventsChannel <- struct {
-					*EventResponse
-					*Response
-					error
-				}{nil, resp, err}
+				eventsChannel <- &AsyncResponse{nil, resp, err}
 				close(eventsChannel)
 				return
 			}
 
 			u, err := getEventURLs(f)
 			if err != nil {
-				eventsChannel <- struct {
-					*EventResponse
-					*Response
-					error
-				}{nil, nil, err}
+				eventsChannel <- &AsyncResponse{nil, nil, err}
 				close(eventsChannel)
 				return
 			}
@@ -282,20 +343,11 @@ func (c *Client) ReadStreamForwardAsync(stream string, version *StreamVersion, t
 			for _, v := range rev {
 				e, resp, err := c.GetEvent(v)
 				if err != nil {
-					eventsChannel <- struct {
-						*EventResponse
-						*Response
-						error
-					}{nil, resp, err}
+					eventsChannel <- &AsyncResponse{nil, resp, err}
 					close(eventsChannel)
 					return
 				}
-
-				eventsChannel <- struct {
-					*EventResponse
-					*Response
-					error
-				}{e, resp, nil}
+				eventsChannel <- &AsyncResponse{e, resp, nil}
 
 				count++
 
@@ -327,28 +379,16 @@ func (c *Client) ReadStreamForwardAsync(stream string, version *StreamVersion, t
 // request, the http status code that was returned and the status message.
 // An *ErrorResponse will also be returned and this will contain the raw http
 // response and status and a description of the error.
-func (c *Client) ReadStreamBackwardAsync(stream string, version *StreamVersion, take *Take) <-chan struct {
-	*EventResponse
-	*Response
-	error
-} {
+func (c *Client) ReadStreamBackwardAsync(stream string, version *StreamVersion, take *Take) <-chan *AsyncResponse {
 
-	eventsChannel := make(chan struct {
-		*EventResponse
-		*Response
-		error
-	})
+	eventsChannel := make(chan *AsyncResponse)
 
 	go func() {
 		count := 0
 
 		url, err := getFeedURL(stream, "backward", version, take)
 		if err != nil {
-			eventsChannel <- struct {
-				*EventResponse
-				*Response
-				error
-			}{nil, nil, err}
+			eventsChannel <- &AsyncResponse{nil, nil, err}
 			close(eventsChannel)
 			return
 		}
@@ -362,22 +402,14 @@ func (c *Client) ReadStreamBackwardAsync(stream string, version *StreamVersion, 
 
 			f, resp, err := c.readStream(url)
 			if err != nil {
-				eventsChannel <- struct {
-					*EventResponse
-					*Response
-					error
-				}{nil, resp, err}
+				eventsChannel <- &AsyncResponse{nil, resp, err}
 				close(eventsChannel)
 				return
 			}
 
 			u, err := getEventURLs(f)
 			if err != nil {
-				eventsChannel <- struct {
-					*EventResponse
-					*Response
-					error
-				}{nil, nil, err}
+				eventsChannel <- &AsyncResponse{nil, nil, err}
 				close(eventsChannel)
 				return
 			}
@@ -399,20 +431,12 @@ func (c *Client) ReadStreamBackwardAsync(stream string, version *StreamVersion, 
 			for _, v := range u {
 				e, resp, err := c.GetEvent(v)
 				if err != nil {
-					eventsChannel <- struct {
-						*EventResponse
-						*Response
-						error
-					}{nil, resp, err}
+					eventsChannel <- &AsyncResponse{nil, resp, err}
 					close(eventsChannel)
 					return
 				}
 
-				eventsChannel <- struct {
-					*EventResponse
-					*Response
-					error
-				}{e, resp, nil}
+				eventsChannel <- &AsyncResponse{e, resp, nil}
 
 				count++
 
