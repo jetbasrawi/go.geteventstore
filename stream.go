@@ -291,9 +291,14 @@ func (c *Client) CatchUpSubcribe(stream string, version *StreamVersion, take *Ta
 // request, the http status code that was returned and the status message.
 // An *ErrorResponse will also be returned and this will contain the raw http
 // response and status and a description of the error.
-func (c *Client) ReadStreamForwardAsync(stream string, version *StreamVersion, take *Take) <-chan *AsyncResponse {
+func (c *Client) ReadStreamForwardAsync(stream string, version *StreamVersion, take *Take, bufSize int) <-chan *AsyncResponse {
 
-	eventsChannel := make(chan *AsyncResponse, 10000)
+	var eventsChannel chan *AsyncResponse
+	if bufSize > 0 {
+		eventsChannel = make(chan *AsyncResponse, bufSize)
+	} else {
+		eventsChannel = make(chan *AsyncResponse)
+	}
 
 	go func() {
 		count := 0

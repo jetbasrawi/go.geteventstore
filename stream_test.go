@@ -236,7 +236,7 @@ func (s *StreamSuite) TestReadStreamForwardAsync(c *C) {
 
 	setupSimulator(es, nil)
 
-	eventsChannel := client.ReadStreamForwardAsync(stream, nil, nil)
+	eventsChannel := client.ReadStreamForwardAsync(stream, nil, nil, 0)
 	count := 0
 	for {
 		select {
@@ -291,7 +291,7 @@ func (s *StreamSuite) TestReadStreamForwardAsyncWithVersion(c *C) {
 	setupSimulator(es, nil)
 
 	ver := &StreamVersion{rand.Intn(ne)}
-	eventsChannel := client.ReadStreamForwardAsync(stream, ver, nil)
+	eventsChannel := client.ReadStreamForwardAsync(stream, ver, nil, 0)
 	count := 0
 	var first *Event
 	var last *Event
@@ -368,7 +368,7 @@ func (s *StreamSuite) TestReadStreamForwardAsyncWithVersionAndTake(c *C) {
 
 	ver := &StreamVersion{rand.Intn(ne)}
 	take := &Take{rand.Intn((ne) - ver.Number)}
-	eventsChannel := client.ReadStreamForwardAsync(stream, ver, take)
+	eventsChannel := client.ReadStreamForwardAsync(stream, ver, take, 0)
 	count := 0
 	var first *Event
 	var last *Event
