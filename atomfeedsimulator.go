@@ -40,6 +40,9 @@ type ESAtomFeedSimulator struct {
 func (h ESAtomFeedSimulator) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	ru := r.URL
+
+	//fmt.Printf("Request URL: %s\n", ru)
+
 	if !ru.IsAbs() {
 		ru = h.BaseURL.ResolveReference(ru)
 	}
@@ -108,6 +111,10 @@ func (h ESAtomFeedSimulator) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func CreateTestFeed(es []*Event, feedURL string) (*atom.Feed, error) {
 
+	//fmt.Println("Creating test feed")
+	//fmt.Printf("URL %s\n", feedURL)
+	//spew.Dump(es)
+
 	r, err := parseURL(feedURL)
 	if err != nil {
 		return nil, err
@@ -173,7 +180,7 @@ func CreateTestEventFromData(stream, server string, eventNumber int, data interf
 	e.EventNumber = eventNumber
 	e.EventType = reflect.TypeOf(data).Elem().Name()
 
-	uuid, _ := NewUUID()
+	uuid := NewUUID()
 	e.EventID = uuid
 
 	b, _ := json.Marshal(data)
@@ -206,7 +213,7 @@ func CreateTestEvent(stream, server, eventType string, eventNumber int, data *js
 	e.EventNumber = eventNumber
 	e.EventType = eventType
 
-	uuid, _ := NewUUID()
+	uuid := NewUUID()
 	e.EventID = uuid
 
 	e.Data = data
@@ -234,7 +241,7 @@ func CreateTestEvents(numEvents int, stream string, server string, eventTypes ..
 		r := rand.Intn(len(eventTypes))
 		eventType := eventTypes[r]
 
-		uuid, _ := NewUUID()
+		uuid := NewUUID()
 		d := fmt.Sprintf("{ \"foo\" : \"%s\" }", uuid)
 		raw := json.RawMessage(d)
 

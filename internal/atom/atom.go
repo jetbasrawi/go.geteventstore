@@ -15,14 +15,21 @@ type Feed struct {
 	Entry   []*Entry `xml:"entry"`
 }
 
-func (f *Feed) PrettyPrint() string {
+func (this *Feed) GetLink(name string) *Link {
+	for _, v := range this.Link {
+		if v.Rel == name {
+			return &v
+		}
+	}
+	return nil
+}
 
+func (f *Feed) PrettyPrint() string {
 	b, err := xml.MarshalIndent(f, "", "	")
 	if err != nil {
 		panic(err)
 	}
 	return string(b)
-
 }
 
 type Entry struct {
@@ -54,5 +61,4 @@ type TimeStr string
 
 func Time(t time.Time) TimeStr {
 	return TimeStr(t.Format("2006-01-02T15:04:05-07:00"))
-
 }

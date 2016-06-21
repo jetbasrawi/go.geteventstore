@@ -59,6 +59,7 @@ func (e *eventAtomResponse) PrettyPrint() string {
 
 // Event encapsulates the data of an eventstore event.
 //
+//EventStreamID is ..TODO
 // EventNumber represents the stream version for this event.
 // EventType describes the event type.
 // EventID is the guid of the event.
@@ -97,6 +98,10 @@ func Time(t time.Time) TimeStr {
 	return TimeStr(t.Format("2006-01-02T15:04:05-07:00"))
 }
 
+type EventFactory interface {
+	GetEvent(string) interface{}
+}
+
 // NewEvent creates a new event object.
 //
 // If an empty eventId is provided an eventId will be generated
@@ -104,7 +109,7 @@ func Time(t time.Time) TimeStr {
 func ToEventData(eventId, eventType string, data interface{}, meta interface{}) *Event {
 	e := &Event{EventType: eventType}
 	if eventId == "" {
-		e.EventID, _ = NewUUID()
+		e.EventID = NewUUID()
 	} else {
 		e.EventID = eventId
 	}

@@ -13,56 +13,8 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"reflect"
 )
-
-//type StreamAppender interface {
-//AppendToStream(string, *StreamVersion, ...*Event) (*Response, error)
-//}
-
-//type MetaDataUpdater interface {
-//UpdateStreamMetaData(string, interface{}) (*Response, error)
-//}
-
-//type MetaDataReader interface {
-//GetStreamMetaData(string) (*EventResponse, *Response, error)
-//}
-
-//type StreamReader interface {
-//ReadStreamForward(string, *StreamVersion, *Take) ([]*EventResponse, *Response, error)
-//ReadStreamBackward(string, *StreamVersion, *Take) ([]*EventResponse, *Response, error)
-//}
-
-//type StreamReaderAsync interface {
-//ReadStreamForwardAsync(string, *StreamVersion, *Take) <-chan struct {
-//*EventResponse
-//*Response
-//error
-//}
-//ReadStreamBackwardAsync(string, *StreamVersion, *Take) <-chan struct {
-//*EventResponse
-//*Response
-//error
-//}
-//}
-
-type GetEventStoreRepositoryClient interface {
-	ReadStreamForwardAsync(string, *StreamVersion, *Take) <-chan struct {
-		*EventResponse
-		*Response
-		error
-	}
-
-	AppendToStream(string, *StreamVersion, ...*Event) (*Response, error)
-}
-
-type EventBuilder interface {
-	ToEventData(string, string, interface{}, interface{}) *Event
-}
-
-type EventReader interface {
-	GetEvent(string) (*EventResponse, *Response, error)
-	GetEvents([]string) ([]*EventResponse, *Response, error)
-}
 
 // client is the object used to interact with the eventstore.
 //
@@ -88,6 +40,60 @@ func NewClient(httpClient *http.Client, serverURL string) (*Client, error) {
 	c := &Client{client: httpClient, BaseURL: baseURL}
 
 	return c, nil
+}
+
+func (c *Client) NewStreamReader(streamName string) StreamReader {
+	return &streamReader{
+		streamName: streamName,
+		client:     c,
+		version:    -1,
+		pageSize:   20,
+	}
+}
+
+func (c *Client) NewStreamWriter(streamName string) StreamWriter {
+	return &streamWriter{
+		client:     c,
+		streamName: streamName,
+	}
+}
+
+func (c *Client) do(req *http.Request, v io.Writer) (*Response, error) {
+	var keep, send io.ReadCloser
+
+	if req.Body != nil {
+		if buf, err := ioutil.ReadAll(req.Body); err == nil {
+			keep = ioutil.NopCloser(bytes.NewReader(buf))
+			send = ioutil.NopCloser(bytes.NewReader(buf))
+			req.Body = send
+		}
+	}
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	defer resp.Body.Close()
+
+	response := newResponse(resp)
+
+	if keep != nil {
+		req.Body = keep
+	}
+	err = checkResponse(resp, req)
+	if err != nil {
+
+		// even though there was an error, we still return the response
+		// in case the caller wants to inspect it further
+		return response, err
+	}
+
+	// When handling post requests v will be nil
+	if v != nil {
+		io.Copy(v, resp.Body)
+	}
+
+	return response, err
 }
 
 // Response encapsulates data from the http response.
@@ -178,41 +184,6 @@ func (c *Client) newRequest(method, urlString string, body interface{}) (*http.R
 	return req, nil
 }
 
-func (c *Client) do(req *http.Request, v io.Writer) (*Response, error) {
-
-	var keep, send io.ReadCloser
-
-	if req.Body != nil {
-		if buf, err := ioutil.ReadAll(req.Body); err == nil {
-			keep = ioutil.NopCloser(bytes.NewReader(buf))
-			send = ioutil.NopCloser(bytes.NewReader(buf))
-			req.Body = send
-		}
-	}
-	resp, err := c.client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	defer resp.Body.Close()
-
-	response := newResponse(resp)
-
-	if keep != nil {
-		req.Body = keep
-	}
-	err = checkResponse(resp, req)
-	if err != nil {
-
-		// even though there was an error, we still return the response
-		// in case the caller wants to inspect it further
-		return response, err
-	}
-
-	// When handling post requests v will be nil
-	if v != nil {
-		io.Copy(v, resp.Body)
-	}
-
-	return response, err
+func typeOf(i interface{}) string {
+	return reflect.TypeOf(i).Elem().Name()
 }

@@ -54,6 +54,10 @@ func (s *SimSuite) TestResolveEvent(c *C) {
 	c.Assert(got, DeepEquals, es[9])
 }
 
+func (s *SimSuite) TestGetFeedWithNoEntries(c *C) {
+
+}
+
 func (s *SimSuite) TestGetSliceSectionForwardFromZero(c *C) {
 	es := CreateTestEvents(1000, "x", "x", "x")
 
