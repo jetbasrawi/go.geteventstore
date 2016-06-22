@@ -3,7 +3,6 @@ package goes
 import (
 	"encoding/json"
 	"fmt"
-	"math"
 	"net/http"
 	"strings"
 
@@ -24,6 +23,7 @@ type streamReader struct {
 	client        *Client
 	version       int
 	nextVersion   int
+	index         int
 	currentURL    string
 	pageSize      int
 	eventResponse *EventResponse
@@ -121,26 +121,16 @@ func (this *streamReader) Next() bool {
 		numEntries = len(this.feedPage.Entry)
 	}
 
-	// index is the index of entries in the current feed page
-	index := int(math.Mod(float64(this.nextVersion), float64(this.pageSize)))
-	fmt.Printf("INDEX %d\n", index)
-	// The final page may have fewer entries than the page size
-	if index >= numEntries {
-		// If the index is greater than the index of the last entry set the index
-		// to 0 and initiate loading the next page
-		index = 0
-		this.loadFeedPage = true
-	}
-
-	fmt.Printf("Version %d NextVersion %d index %d entries %d\n",
-		this.version, this.nextVersion, index, numEntries)
-	fmt.Printf("URL %s\n", this.currentURL)
-	fmt.Printf("Load: %t\n", this.loadFeedPage)
+	//fmt.Printf("Version %d NextVersion %d index %d entries %d\n",
+	//this.version, this.nextVersion, this.index, numEntries)
+	//fmt.Printf("URL %s\n", this.currentURL)
+	//fmt.Printf("Load: %t\n", this.loadFeedPage)
 
 	// The feed page will be nil when the stream reader is first created.
 	// The initial feed page url will be constructed based on the current
 	// version number.
 	if this.feedPage == nil {
+		this.index = -1
 		url, err := getFeedURL(
 			this.streamName,
 			"forward",
@@ -153,15 +143,14 @@ func (this *streamReader) Next() bool {
 			return false
 		}
 		this.currentURL = url
-		this.loadFeedPage = true
-		fmt.Println(url)
+		//fmt.Println(url)
 	}
 
-	// If the index is 0 load the previous feed page.
+	// If the index is less than 0 load the previous feed page.
 	// GetEventStore uses previous to point to more recent feed pages and uses
 	// next to point to older feed pages. A stream starts at the most recent
 	// event and ends at the oldest event.
-	if this.loadFeedPage {
+	if this.index < 0 {
 		if this.feedPage != nil {
 			// Get the url for the previous feed page. If the reader is at the head
 			// of the stream, the previous link in the feedpage will be nil.
@@ -200,25 +189,24 @@ func (this *streamReader) Next() bool {
 					return true
 				}
 			}
-
 		}
+
 		this.feedPage = f
-		this.loadFeedPage = false
 		numEntries = len(f.Entry)
+		this.index = numEntries - 1
+
 	}
 
 	//If there are no events returned at the url return an error
 	if numEntries <= 0 {
 		this.eventResponse = nil
 		this.lasterr = ErrNoEvents
-		this.loadFeedPage = true
 		return true
 	}
 
 	//There are events returned, get the event for the current version
-	revIndex := (numEntries - 1) - index
-	fmt.Printf("revIndex %d numEntries %d\n", revIndex, numEntries)
-	entry := this.feedPage.Entry[revIndex]
+	//fmt.Printf("index %d numEntries %d\n", this.index, numEntries)
+	entry := this.feedPage.Entry[this.index]
 	url := strings.TrimRight(entry.Link[1].Href, "/")
 	e, _, err := this.client.GetEvent(url)
 	if err != nil {
@@ -228,6 +216,7 @@ func (this *streamReader) Next() bool {
 	this.eventResponse = e
 	this.version = this.nextVersion
 	this.nextVersion++
+	this.index--
 
 	return true
 }
