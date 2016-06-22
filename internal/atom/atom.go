@@ -16,6 +16,10 @@ type Feed struct {
 }
 
 func (this *Feed) GetLink(name string) *Link {
+	if this == nil {
+		return nil
+	}
+
 	for _, v := range this.Link {
 		if v.Rel == name {
 			return &v

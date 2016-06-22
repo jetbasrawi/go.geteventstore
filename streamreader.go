@@ -12,23 +12,24 @@ import (
 
 type StreamReader interface {
 	Version() int
+	NextVersion(int)
 	Err() error
 	Next() bool
-	Scan(i interface{}) error
+	Scan(e interface{}, m interface{}) error
 	EventResponse() *EventResponse
 }
 
 type streamReader struct {
-	streamName string
-	client     *Client
-	version    int
-	currentURL string
-	pageSize   int
-
+	streamName    string
+	client        *Client
+	version       int
+	nextVersion   int
+	currentURL    string
+	pageSize      int
 	eventResponse *EventResponse
-	//Event         interface{}
-	FeedPage *atom.Feed
-	lasterr  error
+	feedPage      *atom.Feed
+	lasterr       error
+	loadFeedPage  bool
 }
 
 func (this *streamReader) Err() error {
@@ -37,6 +38,10 @@ func (this *streamReader) Err() error {
 
 func (this *streamReader) Version() int {
 	return this.version
+}
+
+func (this *streamReader) NextVersion(version int) {
+	this.nextVersion = version
 }
 
 func (this *streamReader) EventResponse() *EventResponse {
@@ -109,36 +114,81 @@ func (this *streamReader) EventResponse() *EventResponse {
 //ErrStreamDoesNotExist: Returned when the requested stream does not exist.
 //ErrUnauthorized: Returned when the request is not authorised to read a stream.
 func (this *streamReader) Next() bool {
-	this.version++
 	this.lasterr = nil
 
-	index := int(math.Mod(float64(this.version), float64(this.pageSize)))
+	numEntries := 0
+	if this.feedPage != nil {
+		numEntries = len(this.feedPage.Entry)
+	}
 
-	var urlToLoad string = ""
-	if this.FeedPage == nil {
-		url, err := getFeedURL(this.streamName, "forward", &StreamVersion{Number: this.version}, nil)
+	// index is the index of entries in the current feed page
+	index := int(math.Mod(float64(this.nextVersion), float64(this.pageSize)))
+	fmt.Printf("INDEX %d\n", index)
+	// The final page may have fewer entries than the page size
+	if index >= numEntries {
+		// If the index is greater than the index of the last entry set the index
+		// to 0 and initiate loading the next page
+		index = 0
+		this.loadFeedPage = true
+	}
+
+	fmt.Printf("Version %d NextVersion %d index %d entries %d\n",
+		this.version, this.nextVersion, index, numEntries)
+	fmt.Printf("URL %s\n", this.currentURL)
+	fmt.Printf("Load: %t\n", this.loadFeedPage)
+
+	// The feed page will be nil when the stream reader is first created.
+	// The initial feed page url will be constructed based on the current
+	// version number.
+	if this.feedPage == nil {
+		url, err := getFeedURL(
+			this.streamName,
+			"forward",
+			&StreamVersion{Number: this.nextVersion},
+			nil,
+			this.pageSize,
+		)
 		if err != nil {
 			this.lasterr = err
 			return false
 		}
-		urlToLoad = url
-		//EventStore has links in the atom feed which will
-	} else if index == 0 {
-		l := this.FeedPage.GetLink("previous")
-		urlToLoad = l.Href
+		this.currentURL = url
+		this.loadFeedPage = true
+		fmt.Println(url)
 	}
 
-	if urlToLoad != "" {
-		//Read the page of the streame
-		f, resp, err := this.client.readStream(urlToLoad)
+	// If the index is 0 load the previous feed page.
+	// GetEventStore uses previous to point to more recent feed pages and uses
+	// next to point to older feed pages. A stream starts at the most recent
+	// event and ends at the oldest event.
+	if this.loadFeedPage {
+		if this.feedPage != nil {
+			// Get the url for the previous feed page. If the reader is at the head
+			// of the stream, the previous link in the feedpage will be nil.
+			if l := this.feedPage.GetLink("previous"); l != nil {
+				this.currentURL = l.Href
+			}
+		}
+
+		//Read the feedpage at the current url
+		f, resp, err := this.client.readStream(this.currentURL)
 		if err != nil {
+			// If the response is nil, the error has occured before a http
+			// request. Typically this will be some protocol issue such as
+			// the eventstore server not being available.
+			if resp == nil {
+				this.lasterr = err
+				return true
+			}
+
+			// If the response is not nil the error has occured during the http
+			// request. The response contains further details on the error.
 			if resp != nil {
 				switch resp.StatusCode {
 				//If the stream does not exist an ErrStreamDoesNotExist will
 				//be returned. True is returned to let the client decide in
 				//their loop how to respond.
 				case http.StatusNotFound:
-					this.version--
 					this.lasterr = ErrStreamDoesNotExist
 					return true
 				//If the request has insufficient permissions to access the
@@ -146,42 +196,43 @@ func (this *streamReader) Next() bool {
 				//True is returned to let the client decide in
 				//their loop how to respond.
 				case http.StatusUnauthorized:
-					this.version--
 					this.lasterr = ErrUnauthorized
 					return true
 				}
 			}
 
-			this.version--
-			this.lasterr = err
-			return false
 		}
-		this.FeedPage = f
+		this.feedPage = f
+		this.loadFeedPage = false
+		numEntries = len(f.Entry)
 	}
 
-	//End of the stream reached
-	//return true but with nil event
-	if index >= len(this.FeedPage.Entry) {
+	//If there are no events returned at the url return an error
+	if numEntries <= 0 {
 		this.eventResponse = nil
 		this.lasterr = ErrNoEvents
+		this.loadFeedPage = true
 		return true
 	}
 
-	//spew.Dump(this.FeedPage.Entry)
-	revIndex := (len(this.FeedPage.Entry) - 1) - index
-	entry := this.FeedPage.Entry[revIndex]
+	//There are events returned, get the event for the current version
+	revIndex := (numEntries - 1) - index
+	fmt.Printf("revIndex %d numEntries %d\n", revIndex, numEntries)
+	entry := this.feedPage.Entry[revIndex]
 	url := strings.TrimRight(entry.Link[1].Href, "/")
 	e, _, err := this.client.GetEvent(url)
 	if err != nil {
 		this.lasterr = err
-		return false
+		return true
 	}
 	this.eventResponse = e
+	this.version = this.nextVersion
+	this.nextVersion++
 
 	return true
 }
 
-func (this *streamReader) Scan(e interface{}) error {
+func (this *streamReader) Scan(e interface{}, m interface{}) error {
 
 	if this.lasterr != nil {
 		return this.lasterr
@@ -191,13 +242,26 @@ func (this *streamReader) Scan(e interface{}) error {
 		return ErrNoEvents
 	}
 
-	data, ok := this.eventResponse.Event.Data.(*json.RawMessage)
-	if !ok {
-		return fmt.Errorf("Could not unmarshal the event. Event data is not of type *json.RawMessage")
+	if e != nil {
+		data, ok := this.eventResponse.Event.Data.(*json.RawMessage)
+		if !ok {
+			return fmt.Errorf("Could not unmarshal the event. Event data is not of type *json.RawMessage")
+		}
+
+		if err := json.Unmarshal(*data, e); err != nil {
+			return err
+		}
 	}
 
-	if err := json.Unmarshal(*data, e); err != nil {
-		return err
+	if m != nil {
+		meta, ok := this.eventResponse.Event.MetaData.(*json.RawMessage)
+		if !ok {
+			return fmt.Errorf("Could not unmarshal the event. Event data is not of type *json.RawMessage")
+		}
+
+		if err := json.Unmarshal(*meta, &m); err != nil {
+			return err
+		}
 	}
 
 	return nil

@@ -53,7 +53,7 @@ func (s *StreamReaderSuite) TestNextMovesForwardOneEvent(c *C) {
 
 		count--
 		var got, want *FooEvent
-		err := stream.Scan(&got)
+		err := stream.Scan(&got, nil)
 		c.Assert(err, IsNil)
 
 		ev := es[count]
@@ -83,7 +83,7 @@ func (s *StreamReaderSuite) TestNextReturnsErrorIfStreamDoesNotExist(c *C) {
 
 func (s *StreamReaderSuite) TestNextReturnsErrorIfUserIsNotAuthorisedToAccessStream(c *C) {
 	streamName := "SomeStream"
-	path := fmt.Sprintf("/streams/%s/0/forward/100", streamName)
+	path := fmt.Sprintf("/streams/%s/0/forward/20", streamName)
 
 	mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -112,7 +112,7 @@ func (s *StreamReaderSuite) TestNextAtHeadOfStreamReturnsTrueWithNoEvent(c *C) {
 	c.Assert(stream.EventResponse(), IsNil)
 }
 
-func (s *StreamReaderSuite) TestNextCreatedErrorIfThereIsNoNextEventToReturn(c *C) {
+func (s *StreamReaderSuite) TestNextReturnsErrorIfThereIsNoNextEventToReturn(c *C) {
 	streamName := "SomeStream"
 	ne := 1
 	es := CreateTestEvents(ne, streamName, server.URL, "FooEvent")
@@ -125,6 +125,88 @@ func (s *StreamReaderSuite) TestNextCreatedErrorIfThereIsNoNextEventToReturn(c *
 	_ = stream.Next()
 	c.Assert(stream.Err(), Equals, ErrNoEvents)
 	c.Assert(stream.EventResponse(), IsNil)
+}
+
+func (s *StreamReaderSuite) TestScanEventData(c *C) {
+	streamName := "SomeStream"
+	ne := 1
+	es := CreateTestEvents(ne, streamName, server.URL, "FooEvent")
+
+	setupSimulator(es, nil)
+
+	stream := client.NewStreamReader(streamName)
+	_ = stream.Next()
+	got := &FooEvent{}
+	stream.Scan(&got, nil)
+	c.Assert(stream.Err(), IsNil)
+
+	//Get the AggregateID from the event headers
+	raw, _ := es[0].Data.(*json.RawMessage)
+	want := &FooEvent{}
+	err := json.Unmarshal(*raw, &want)
+	c.Assert(err, IsNil)
+	c.Assert(got, DeepEquals, want)
+}
+
+func (s *StreamReaderSuite) TestScanMetaData(c *C) {
+	streamName := "SomeStream"
+	ne := 1
+	es := CreateTestEvents(ne, streamName, server.URL, "FooEvent")
+
+	setupSimulator(es, nil)
+
+	stream := client.NewStreamReader(streamName)
+	_ = stream.Next()
+	got := make(map[string]string)
+	stream.Scan(nil, &got)
+	c.Assert(stream.Err(), IsNil)
+
+	//Get the AggregateID from the event headers
+	raw, _ := es[0].MetaData.(*json.RawMessage)
+	want := make(map[string]string)
+	err := json.Unmarshal(*raw, &want)
+	c.Assert(err, IsNil)
+	c.Assert(got, DeepEquals, want)
+}
+
+func (s *StreamReaderSuite) TestSetStreamVersion(c *C) {
+	streamName := "FooStream"
+	ne := 25
+	es := CreateTestEvents(ne, streamName, server.URL, "FooEvent")
+
+	setupSimulator(es, nil)
+
+	stream := client.NewStreamReader(streamName)
+	stream.NextVersion(9)
+	stream.Next()
+	c.Assert(stream.Err(), IsNil)
+	c.Assert(stream.EventResponse().Event.EventNumber, Equals, 9)
+}
+
+func (s *StreamReaderSuite) TestFeedWithFewerEntriesThanThePageSize(c *C) {
+
+	streamName := "SomeStream"
+	ne := 25
+	es := CreateTestEvents(ne, streamName, server.URL, "FooEvent")
+
+	setupSimulator(es, nil)
+
+	stream := client.NewStreamReader(streamName)
+
+	count := 0
+	for stream.Next() {
+		if stream.Err() == ErrNoEvents {
+			break
+		}
+		//fmt.Printf("\n\nCount: %d\n", count)
+		//spew.Dump(stream.EventResponse())
+
+		c.Assert(stream.EventResponse(), NotNil)
+		c.Assert(stream.Version(), Equals, count)
+		count++
+	}
+
+	c.Assert(count, Equals, ne)
 }
 
 //func (s *StreamSuite) TestGetMetaReturnsNilWhenStreamMetaDataIsEmpty(c *C) {

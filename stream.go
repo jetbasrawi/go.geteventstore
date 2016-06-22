@@ -86,7 +86,7 @@ func (c *Client) readStream(url string) (*atom.Feed, *Response, error) {
 // getMetadataURL gets the url for the stream metadata.
 func (c *Client) getMetadataURL(stream string) (string, *Response, error) {
 
-	url, err := getFeedURL(stream, "backward", nil, nil)
+	url, err := getFeedURL(stream, "backward", nil, nil, 1)
 	if err != nil {
 		return "", nil, err
 	}
@@ -107,21 +107,17 @@ func (c *Client) getMetadataURL(stream string) (string, *Response, error) {
 // returns an *atom.Feed object.
 // In case of an error, the returned object will be nil.
 func unmarshalFeed(r io.Reader) (*atom.Feed, error) {
-
 	f := &atom.Feed{}
 	err := xml.NewDecoder(r).Decode(f)
 	if err != nil {
 		return nil, err
-
 	}
 	return f, nil
-
 }
 
 // getEventURLs extracts a slice of event urls from the feed object.
 func getEventURLs(f *atom.Feed) ([]string, error) {
 	s := make([]string, len(f.Entry))
-
 	for i := 0; i < len(f.Entry); i++ {
 		e := f.Entry[i]
 		s[i] = strings.TrimRight(e.Link[1].Href, "/")
@@ -134,12 +130,12 @@ func getEventURLs(f *atom.Feed) ([]string, error) {
 //
 // If version, take an direction are all nil or empty, the url returned will be
 // to read from the head of the stream backward with a page size of 100
-func getFeedURL(stream, direction string, version *StreamVersion, take *Take) (string, error) {
-
-	ps := 100
+func getFeedURL(stream, direction string, version *StreamVersion, take *Take, pageSize int) (string, error) {
+	ps := pageSize
 	if take != nil && take.Number < ps {
 		ps = take.Number
 	}
+
 	dir := ""
 	switch direction {
 	case "":
