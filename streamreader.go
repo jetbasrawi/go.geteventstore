@@ -178,20 +178,29 @@ func (this *streamReader) Next() bool {
 				//be returned. True is returned to let the client decide in
 				//their loop how to respond.
 				case http.StatusNotFound:
-					this.lasterr = ErrStreamDoesNotExist
+					this.lasterr = &StreamDoesNotExistError{}
 					return true
 				//If the request has insufficient permissions to access the
 				//stream ErrUnauthorized will be returned.
 				//True is returned to let the client decide in
 				//their loop how to respond.
 				case http.StatusUnauthorized:
-					this.lasterr = ErrUnauthorized
+					this.lasterr = &UnauthorizedError{}
+					return true
+				//503 is also returned if the server is temporarily unable
+				//to handle the request
+				case http.StatusServiceUnavailable:
+					this.lasterr = &TemporarilyUnavailableError{}
+					return true
+				default:
+					this.lasterr = err
 					return true
 				}
 			}
 		}
 
 		this.feedPage = f
+
 		numEntries = len(f.Entry)
 		this.index = numEntries - 1
 
@@ -200,7 +209,7 @@ func (this *streamReader) Next() bool {
 	//If there are no events returned at the url return an error
 	if numEntries <= 0 {
 		this.eventResponse = nil
-		this.lasterr = ErrNoEvents
+		this.lasterr = &NoMoreEventsError{}
 		return true
 	}
 
@@ -228,7 +237,7 @@ func (this *streamReader) Scan(e interface{}, m interface{}) error {
 	}
 
 	if this.eventResponse == nil {
-		return ErrNoEvents
+		return &NoMoreEventsError{}
 	}
 
 	if e != nil {

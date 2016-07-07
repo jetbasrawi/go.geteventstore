@@ -185,5 +185,8 @@ func (c *Client) newRequest(method, urlString string, body interface{}) (*http.R
 }
 
 func typeOf(i interface{}) string {
+	if i == nil {
+		return ""
+	}
 	return reflect.TypeOf(i).Elem().Name()
 }

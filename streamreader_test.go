@@ -77,7 +77,7 @@ func (s *StreamReaderSuite) TestNextReturnsErrorIfStreamDoesNotExist(c *C) {
 	stream := client.NewStreamReader(streamName)
 	ok := stream.Next()
 	c.Assert(ok, Equals, true)
-	c.Assert(stream.Err(), Equals, ErrStreamDoesNotExist)
+	c.Assert(stream.Err(), DeepEquals, &StreamDoesNotExistError{})
 
 }
 
@@ -93,7 +93,7 @@ func (s *StreamReaderSuite) TestNextReturnsErrorIfUserIsNotAuthorisedToAccessStr
 	stream := client.NewStreamReader(streamName)
 	ok := stream.Next()
 	c.Assert(ok, Equals, true)
-	c.Assert(stream.Err(), Equals, ErrUnauthorized)
+	c.Assert(stream.Err(), Equals, &UnauthorizedError{})
 }
 
 func (s *StreamReaderSuite) TestNextAtHeadOfStreamReturnsTrueWithNoEvent(c *C) {
@@ -116,14 +116,14 @@ func (s *StreamReaderSuite) TestNextReturnsErrorIfThereIsNoNextEventToReturn(c *
 	streamName := "SomeStream"
 	ne := 1
 	es := CreateTestEvents(ne, streamName, server.URL, "FooEvent")
-
 	setupSimulator(es, nil)
+	want := &NoMoreEventsError{}
 
 	stream := client.NewStreamReader(streamName)
 	_ = stream.Next()
 
 	_ = stream.Next()
-	c.Assert(stream.Err(), Equals, ErrNoEvents)
+	c.Assert(stream.Err(), DeepEquals, want)
 	c.Assert(stream.EventResponse(), IsNil)
 }
 
@@ -194,10 +194,16 @@ func (s *StreamReaderSuite) TestFeedWithFewerEntriesThanThePageSize(c *C) {
 	stream := client.NewStreamReader(streamName)
 
 	count := 0
+
 	for stream.Next() {
-		if stream.Err() == ErrNoEvents {
-			break
+
+		switch err := stream.Err().(type) {
+		case *NoMoreEventsError:
+			c.Assert(err, NotNil)
+			c.Assert(count, Equals, ne)
+			return
 		}
+
 		//fmt.Printf("\n\nCount: %d\n", count)
 		//spew.Dump(stream.EventResponse())
 
@@ -206,7 +212,6 @@ func (s *StreamReaderSuite) TestFeedWithFewerEntriesThanThePageSize(c *C) {
 		count++
 	}
 
-	c.Assert(count, Equals, ne)
 }
 
 //func (s *StreamSuite) TestGetMetaReturnsNilWhenStreamMetaDataIsEmpty(c *C) {

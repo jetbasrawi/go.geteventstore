@@ -16,15 +16,33 @@ import (
 	"github.com/jetbasrawi/goes/internal/atom"
 )
 
-var (
-	ErrNoEvents           = errors.New("There are no events to return.")
-	ErrStreamDoesNotExist = errors.New("The stream does not exist.")
-	ErrUnauthorized       = errors.New("Not authorized to access the stream.")
-)
+type NoMoreEventsError struct{}
+
+func (e NoMoreEventsError) Error() string {
+	return "There are no more events to load."
+}
+
+type StreamDoesNotExistError struct{}
+
+func (e StreamDoesNotExistError) Error() string {
+	return "The stream does not exist."
+}
+
+type UnauthorizedError struct{}
+
+func (e UnauthorizedError) Error() string {
+	return "The stream does not exist."
+}
+
+type TemporarilyUnavailableError struct{}
+
+func (e TemporarilyUnavailableError) Error() string {
+	return "Server Is Not Ready"
+}
 
 //type EventStore interface {
 //Dial(streamName string) StreamReader
-//}
+//
 
 // StreamVersion is used to communicate the desired version of the stream when
 // reading or appending to a stream.
