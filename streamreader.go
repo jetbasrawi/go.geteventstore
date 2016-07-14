@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/jetbasrawi/goes/internal/atom"
@@ -11,11 +12,12 @@ import (
 
 type StreamReader interface {
 	Version() int
-	NextVersion(int)
+	NextVersion(version int)
 	Err() error
 	Next() bool
 	Scan(e interface{}, m interface{}) error
 	EventResponse() *EventResponse
+	LongPoll(seconds int)
 }
 
 type streamReader struct {
@@ -98,7 +100,9 @@ func (this *streamReader) EventResponse() *EventResponse {
 //					this.version--
 //					continue
 //				case ErrUnauthorised:
-//					//
+//					// Indicates that you are not authorised to access the stream
+// however, when accessing system streams such as a category
+// projection this error is returned in cases where
 //				case ErrStreamDoesNotExist:
 //					//
 //				default:
@@ -263,6 +267,32 @@ func (this *streamReader) Scan(e interface{}, m interface{}) error {
 	}
 
 	return nil
+}
+
+// LongPoll causes the server to wait up to the number of seconds specified for
+// for results to become available at the URL requested.
+//
+// LongPoll will cause the next request for a feedpage to be made with the
+// with the ES-LongPoll optional header. When reading a stream past the head,
+// the server will wait for the duration specified or until new events are
+// returned.
+//
+// LongPoll is useful when polling the end of the stream as it returns as soon
+// as new events are found which means that it is more responsive than polling
+// over some time interval like 2 seconds. It also reduces the number of
+// unproductive calls to the server polling for events when there are no new
+// events to return.
+//
+// Setting the argument seconds to any integer value above 0 will cause the
+// request to be made with ES-LongPoll set to that value. Any value 0 or below
+// will cause the request to be made without ES-LongPoll and the server will not
+// wait to return.
+func (this *streamReader) LongPoll(seconds int) {
+	if seconds > 0 {
+		this.client.headers["ES-LongPoll"] = strconv.Itoa(seconds)
+	} else {
+		delete(this.client.headers, "ES-LongPoll")
+	}
 }
 
 //// MetaData gets the metadata for a stream.

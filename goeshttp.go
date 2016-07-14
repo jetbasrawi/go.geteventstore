@@ -27,7 +27,8 @@ type basicAuthCredentials struct {
 type Client struct {
 	client      *http.Client
 	BaseURL     *url.URL
-	Credentials *basicAuthCredentials
+	credentials *basicAuthCredentials
+	headers     map[string]string
 }
 
 // NewClient constructs and returns a new client.
@@ -43,7 +44,13 @@ func NewClient(httpClient *http.Client, serverURL string) (*Client, error) {
 		return nil, err
 	}
 
-	c := &Client{client: httpClient, BaseURL: baseURL}
+	c := &Client{
+		client:  httpClient,
+		BaseURL: baseURL,
+		headers: make(map[string]string),
+	}
+
+	c.headers["Content-Type"] = "application/vnd.eventstore.events+json"
 
 	return c, nil
 }
@@ -103,7 +110,7 @@ func (c *Client) do(req *http.Request, v io.Writer) (*Response, error) {
 }
 
 func (c *Client) SetBasicAuth(username, password string) {
-	c.Credentials = &basicAuthCredentials{
+	c.credentials = &basicAuthCredentials{
 		Username: username,
 		Password: password,
 	}
@@ -192,11 +199,13 @@ func (c *Client) newRequest(method, urlString string, body interface{}) (*http.R
 		return nil, err
 	}
 
-	if c.Credentials != nil {
-		req.SetBasicAuth(c.Credentials.Username, c.Credentials.Password)
+	if c.credentials != nil {
+		req.SetBasicAuth(c.credentials.Username, c.credentials.Password)
 	}
 
-	req.Header.Set("Content-Type", "application/vnd.eventstore.events+json")
+	for k, v := range c.headers {
+		req.Header.Set(k, v)
+	}
 
 	return req, nil
 }

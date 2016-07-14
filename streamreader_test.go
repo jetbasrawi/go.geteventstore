@@ -75,7 +75,9 @@ func (s *StreamReaderSuite) TestNextReturnsErrorIfStreamDoesNotExist(c *C) {
 	c.Assert(stream.Err(), DeepEquals, &StreamDoesNotExistError{})
 }
 
-func (s *StreamReaderSuite) TestNextReturnsErrorIfUserIsNotAuthorisedToAccessStream(c *C) {
+// Tests that the stream returns appropriate error when the request results in
+// an Unauthorized status
+func (s *StreamReaderSuite) TestNextErrorsIfNotAuthorisedToAccessStream(c *C) {
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
 		fmt.Fprintf(w, "")
@@ -87,6 +89,9 @@ func (s *StreamReaderSuite) TestNextReturnsErrorIfUserIsNotAuthorisedToAccessStr
 	c.Assert(stream.Err(), Equals, &UnauthorizedError{})
 }
 
+// Testing the case where next has reached the end of the stream and there are
+// no more events to return. The EventResponse should be nil but next returns
+// true
 func (s *StreamReaderSuite) TestNextAtHeadOfStreamReturnsTrueWithNoEvent(c *C) {
 	streamName := "SomeStream"
 	ne := 1
@@ -103,7 +108,9 @@ func (s *StreamReaderSuite) TestNextAtHeadOfStreamReturnsTrueWithNoEvent(c *C) {
 	c.Assert(stream.EventResponse(), IsNil)
 }
 
-func (s *StreamReaderSuite) TestNextReturnsErrorIfThereIsNoNextEventToReturn(c *C) {
+// When there are no events to return, the stream error will be set to an
+// appropriate error
+func (s *StreamReaderSuite) TestReturnsErrorIfThereIsNoNextEventToReturn(c *C) {
 	streamName := "SomeStream"
 	ne := 1
 	es := CreateTestEvents(ne, streamName, server.URL, "FooEvent")
@@ -118,6 +125,7 @@ func (s *StreamReaderSuite) TestNextReturnsErrorIfThereIsNoNextEventToReturn(c *
 	c.Assert(stream.EventResponse(), IsNil)
 }
 
+// Tests the deserialisation of events
 func (s *StreamReaderSuite) TestScanEventData(c *C) {
 	streamName := "SomeStream"
 	ne := 1
@@ -139,6 +147,7 @@ func (s *StreamReaderSuite) TestScanEventData(c *C) {
 	c.Assert(got, DeepEquals, want)
 }
 
+// Test the deserialization of event meta data
 func (s *StreamReaderSuite) TestScanMetaData(c *C) {
 	streamName := "SomeStream"
 	ne := 1
@@ -160,6 +169,7 @@ func (s *StreamReaderSuite) TestScanMetaData(c *C) {
 	c.Assert(got, DeepEquals, want)
 }
 
+// Test reading the stream at a specific version
 func (s *StreamReaderSuite) TestSetStreamVersion(c *C) {
 	streamName := "FooStream"
 	ne := 25
@@ -174,6 +184,8 @@ func (s *StreamReaderSuite) TestSetStreamVersion(c *C) {
 	c.Assert(stream.EventResponse().Event.EventNumber, Equals, 9)
 }
 
+// Test that the feed returns the correct number of results when the request
+// span exceeds the number of events
 func (s *StreamReaderSuite) TestFeedWithFewerEntriesThanThePageSize(c *C) {
 	streamName := "SomeStream"
 	ne := 25
@@ -182,22 +194,42 @@ func (s *StreamReaderSuite) TestFeedWithFewerEntriesThanThePageSize(c *C) {
 	setupSimulator(es, nil)
 
 	stream := client.NewStreamReader(streamName)
-
 	count := 0
-
 	for stream.Next() {
-
 		switch err := stream.Err().(type) {
 		case *NoMoreEventsError:
 			c.Assert(err, NotNil)
 			c.Assert(count, Equals, ne)
 			return
 		}
-
 		c.Assert(stream.EventResponse(), NotNil)
 		c.Assert(stream.Version(), Equals, count)
 		count++
 	}
+}
+
+// Tests that the request to the stream is made with the ES-LongPoll header.
+// The header will cause the server to wait for events to be returned on requests
+// to the server at the head of the stream.
+func (s *StreamReaderSuite) TestLongPollNonZero(c *C) {
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		val := r.Header.Get("ES-LongPoll")
+		c.Assert(val, Equals, "15")
+	})
+	stream := client.NewStreamReader("SomeStream")
+	stream.LongPoll(15)
+	stream.Next()
+}
+
+// Test that long poll header is not included when long poll is set to 0
+func (s *StreamReaderSuite) TestLongPollZero(c *C) {
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		val := r.Header.Get("ES-LongPoll")
+		c.Assert(val, Equals, "")
+	})
+	stream := client.NewStreamReader("SomeStream")
+	stream.LongPoll(0)
+	stream.Next()
 }
 
 //func (s *StreamSuite) TestGetMetaReturnsNilWhenStreamMetaDataIsEmpty(c *C) {
