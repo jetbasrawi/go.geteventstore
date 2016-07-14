@@ -1,6 +1,7 @@
 package goes
 
 import (
+	b64 "encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -87,6 +88,26 @@ func (s *GoesSuite) TestNewRequest(c *C) {
 	body, _ := ioutil.ReadAll(req.Body)
 	c.Assert(string(body), Equals, outBody)
 	c.Assert(req.Header.Get("Content-Type"), Equals, contentType)
+}
+
+func (s *GoesSuite) TestRequestsAreSentWithBasicAuthIfSet(c *C) {
+
+	username := "user"
+	password := "pass"
+	headerStr := "Basic " + b64.StdEncoding.EncodeToString([]byte(username+":"+password))
+
+	var authFound bool
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		header := r.Header.Get("Authorization")
+		authFound = header == headerStr
+		fmt.Fprintf(w, "")
+	})
+
+	client.SetBasicAuth("user", "pass")
+	streamReader := client.NewStreamReader("something")
+	_ = streamReader.Next()
+	c.Assert(authFound, Equals, true)
+
 }
 
 func (s *GoesSuite) TestNewRequestWithInvalidJSONReturnsError(c *C) {

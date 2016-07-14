@@ -31,7 +31,7 @@ func (e StreamDoesNotExistError) Error() string {
 type UnauthorizedError struct{}
 
 func (e UnauthorizedError) Error() string {
-	return "The stream does not exist."
+	return "You are not authorised to access the stream or the stream does not exist."
 }
 
 type TemporarilyUnavailableError struct{}
@@ -39,10 +39,6 @@ type TemporarilyUnavailableError struct{}
 func (e TemporarilyUnavailableError) Error() string {
 	return "Server Is Not Ready"
 }
-
-//type EventStore interface {
-//Dial(streamName string) StreamReader
-//
 
 // StreamVersion is used to communicate the desired version of the stream when
 // reading or appending to a stream.
@@ -102,6 +98,10 @@ func (c *Client) readStream(url string) (*atom.Feed, *Response, error) {
 }
 
 // getMetadataURL gets the url for the stream metadata.
+// according to the documentation the metadata url should be acquired through
+// a query to the stream feed as the authors of GetEventStore reserve the right
+// to change the url.
+// http://docs.geteventstore.com/http-api/3.7.0/stream-metadata/
 func (c *Client) getMetadataURL(stream string) (string, *Response, error) {
 
 	url, err := getFeedURL(stream, "backward", nil, nil, 1)
@@ -123,7 +123,7 @@ func (c *Client) getMetadataURL(stream string) (string, *Response, error) {
 
 // unmarshalFeed decodes the io.Reader taken from the http response body and
 // returns an *atom.Feed object.
-// In case of an error, the returned object will be nil.
+// In case of an error, the returned Feed object will be nil.
 func unmarshalFeed(r io.Reader) (*atom.Feed, error) {
 	f := &atom.Feed{}
 	err := xml.NewDecoder(r).Decode(f)

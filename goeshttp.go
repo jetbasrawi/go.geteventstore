@@ -16,12 +16,18 @@ import (
 	"reflect"
 )
 
+type basicAuthCredentials struct {
+	Username string
+	Password string
+}
+
 // client is the object used to interact with the eventstore.
 //
 // Use the NewClient constructor to get a client.
 type Client struct {
-	client  *http.Client
-	BaseURL *url.URL
+	client      *http.Client
+	BaseURL     *url.URL
+	Credentials *basicAuthCredentials
 }
 
 // NewClient constructs and returns a new client.
@@ -94,6 +100,13 @@ func (c *Client) do(req *http.Request, v io.Writer) (*Response, error) {
 	}
 
 	return response, err
+}
+
+func (c *Client) SetBasicAuth(username, password string) {
+	c.Credentials = &basicAuthCredentials{
+		Username: username,
+		Password: password,
+	}
 }
 
 // Response encapsulates data from the http response.
@@ -177,6 +190,10 @@ func (c *Client) newRequest(method, urlString string, body interface{}) (*http.R
 	req, err := http.NewRequest(method, url.String(), buf)
 	if err != nil {
 		return nil, err
+	}
+
+	if c.Credentials != nil {
+		req.SetBasicAuth(c.Credentials.Username, c.Credentials.Password)
 	}
 
 	req.Header.Set("Content-Type", "application/vnd.eventstore.events+json")

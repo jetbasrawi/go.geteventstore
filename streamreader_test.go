@@ -65,32 +65,23 @@ func (s *StreamReaderSuite) TestNextMovesForwardOneEvent(c *C) {
 	}
 }
 
+// If the consumer is trying to access a system stream such as a category
+// stream, the response from the server may actually be an unauthorised error
+// rather than not found. This is testing the not found case.
 func (s *StreamReaderSuite) TestNextReturnsErrorIfStreamDoesNotExist(c *C) {
-	streamName := "foostream"
-	path := fmt.Sprintf("/streams/%s/0/forward/100", streamName)
-
-	mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNotFound)
-		fmt.Fprintf(w, "")
-	})
-
-	stream := client.NewStreamReader(streamName)
+	stream := client.NewStreamReader("Something")
 	ok := stream.Next()
 	c.Assert(ok, Equals, true)
 	c.Assert(stream.Err(), DeepEquals, &StreamDoesNotExistError{})
-
 }
 
 func (s *StreamReaderSuite) TestNextReturnsErrorIfUserIsNotAuthorisedToAccessStream(c *C) {
-	streamName := "SomeStream"
-	path := fmt.Sprintf("/streams/%s/0/forward/20", streamName)
-
-	mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
 		fmt.Fprintf(w, "")
 	})
 
-	stream := client.NewStreamReader(streamName)
+	stream := client.NewStreamReader("Something")
 	ok := stream.Next()
 	c.Assert(ok, Equals, true)
 	c.Assert(stream.Err(), Equals, &UnauthorizedError{})
@@ -184,7 +175,6 @@ func (s *StreamReaderSuite) TestSetStreamVersion(c *C) {
 }
 
 func (s *StreamReaderSuite) TestFeedWithFewerEntriesThanThePageSize(c *C) {
-
 	streamName := "SomeStream"
 	ne := 25
 	es := CreateTestEvents(ne, streamName, server.URL, "FooEvent")
@@ -204,14 +194,10 @@ func (s *StreamReaderSuite) TestFeedWithFewerEntriesThanThePageSize(c *C) {
 			return
 		}
 
-		//fmt.Printf("\n\nCount: %d\n", count)
-		//spew.Dump(stream.EventResponse())
-
 		c.Assert(stream.EventResponse(), NotNil)
 		c.Assert(stream.Version(), Equals, count)
 		count++
 	}
-
 }
 
 //func (s *StreamSuite) TestGetMetaReturnsNilWhenStreamMetaDataIsEmpty(c *C) {
