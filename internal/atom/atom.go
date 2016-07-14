@@ -6,13 +6,15 @@ import (
 )
 
 type Feed struct {
-	XMLName xml.Name `xml:"http://www.w3.org/2005/Atom feed"`
-	Title   string   `xml:"title"`
-	ID      string   `xml:"id"`
-	Link    []Link   `xml:"link"`
-	Updated TimeStr  `xml:"updated"`
-	Author  *Person  `xml:"author"`
-	Entry   []*Entry `xml:"entry"`
+	XMLName      xml.Name `xml:"http://www.w3.org/2005/Atom feed"`
+	Title        string   `xml:"title"`
+	ID           string   `xml:"id"`
+	StreamID     string   `xml:"streamId"`
+	HeadOfStream bool     `xml:"headOfStream"`
+	Link         []Link   `xml:"link"`
+	Updated      TimeStr  `xml:"updated"`
+	Author       *Person  `xml:"author"`
+	Entry        []*Entry `xml:"entry"`
 }
 
 func (this *Feed) GetLink(name string) *Link {

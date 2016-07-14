@@ -55,17 +55,18 @@ func (s *SimSuite) TestResolveEvent(c *C) {
 }
 
 func (s *SimSuite) TestGetFeedWithNoEntries(c *C) {
-
+	//TODO:
 }
 
 func (s *SimSuite) TestGetSliceSectionForwardFromZero(c *C) {
 	es := CreateTestEvents(1000, "x", "x", "x")
 
-	sl, isF, isL := getSliceSection(es, &StreamVersion{Number: 0}, 100, "forward")
+	sl, isF, isL, isH := getSliceSection(es, &StreamVersion{Number: 0}, 100, "forward")
 
 	c.Assert(sl, HasLen, 100)
 	c.Assert(isF, Equals, false)
 	c.Assert(isL, Equals, true)
+	c.Assert(isH, Equals, false)
 	c.Assert(sl[0].EventNumber, Equals, 0)
 	c.Assert(sl[len(sl)-1].EventNumber, Equals, 99)
 }
@@ -74,11 +75,13 @@ func (s *SimSuite) TestGetSliceSectionForwardFromZero(c *C) {
 func (su *SimSuite) TestGetSliceSectionForward(c *C) {
 	es := CreateTestEvents(100, "x", "x", "x")
 
-	s, isF, isL := getSliceSection(es, &StreamVersion{Number: 25}, 50, "forward")
+	s, isF, isL, isH := getSliceSection(es, &StreamVersion{Number: 25}, 50, "forward")
 
 	c.Assert(s, HasLen, 50)
 	c.Assert(isF, Equals, false)
 	c.Assert(isL, Equals, false)
+	c.Assert(isH, Equals, false)
+
 	c.Assert(s[0].EventNumber, Equals, 25)
 	c.Assert(s[len(s)-1].EventNumber, Equals, 74)
 }
@@ -87,11 +90,12 @@ func (su *SimSuite) TestGetSliceSectionForward(c *C) {
 func (su *SimSuite) TestGetSliceSectionBackward(c *C) {
 	es := CreateTestEvents(100, "x", "x", "x")
 
-	s, isF, isL := getSliceSection(es, &StreamVersion{Number: 75}, 50, "backward")
+	s, isF, isL, isH := getSliceSection(es, &StreamVersion{Number: 75}, 50, "backward")
 
 	c.Assert(s, HasLen, 50)
 	c.Assert(isF, Equals, false)
 	c.Assert(isL, Equals, false)
+	c.Assert(isH, Equals, false)
 	c.Assert(s[0].EventNumber, Equals, 26)
 	c.Assert(s[len(s)-1].EventNumber, Equals, 75)
 }
@@ -101,11 +105,12 @@ func (su *SimSuite) TestGetSliceSectionBackward(c *C) {
 func (su *SimSuite) TestGetSliceSectionBackwardUnder(c *C) {
 	es := CreateTestEvents(100, "x", "x", "x")
 
-	s, isF, isL := getSliceSection(es, &StreamVersion{Number: 25}, 50, "backward")
+	s, isF, isL, isH := getSliceSection(es, &StreamVersion{Number: 25}, 50, "backward")
 
 	c.Assert(s, HasLen, 26)
 	c.Assert(isF, Equals, false)
 	c.Assert(isL, Equals, true)
+	c.Assert(isH, Equals, false)
 	c.Assert(s[0].EventNumber, Equals, 0)
 	c.Assert(s[len(s)-1].EventNumber, Equals, 25)
 }
@@ -116,44 +121,50 @@ func (su *SimSuite) TestGetSliceSectionBackwardUnder(c *C) {
 func (su *SimSuite) TestGetSliceSectionForwardOut(c *C) {
 	es := CreateTestEvents(100, "x", "x", "x")
 
-	s, isF, isL := getSliceSection(es, &StreamVersion{Number: 101}, 50, "forward")
+	s, isF, isL, isH := getSliceSection(es, &StreamVersion{Number: 101}, 50, "forward")
 
 	c.Assert(s, HasLen, 0)
 	c.Assert(isF, Equals, true)
 	c.Assert(isL, Equals, false)
+	c.Assert(isH, Equals, true)
+
 }
 
-//Version number in range, but page size means full set will exceed
-//the head of the stream
+// Version number is in range but version plus pagesize is greter the the highest
+// event number and so the query exeeds the number of results that can be returned
 func (su *SimSuite) TestGetSliceSectionForwardOver(c *C) {
 	es := CreateTestEvents(100, "x", "x", "x")
 
-	s, isF, isL := getSliceSection(es, &StreamVersion{Number: 75}, 50, "forward")
+	s, isF, isL, isH := getSliceSection(es, &StreamVersion{Number: 75}, 50, "forward")
 	c.Assert(s, HasLen, 25)
 	c.Assert(isF, Equals, true)
 	c.Assert(isL, Equals, false)
+	c.Assert(isH, Equals, true)
 	c.Assert(s[0].EventNumber, Equals, 75)
 	c.Assert(s[len(s)-1].EventNumber, Equals, 99)
 }
 
+// This test covers the case where the version is higher than the highest version
 func (su *SimSuite) TestGetSliceSectionTail(c *C) {
 	es := CreateTestEvents(100, "x", "x", "x")
 
-	s, isF, isL := getSliceSection(es, &StreamVersion{Number: 100}, 20, "forward")
+	s, isF, isL, isH := getSliceSection(es, &StreamVersion{Number: 100}, 20, "forward")
 
 	c.Assert(s, HasLen, 0)
 	c.Assert(isF, Equals, true)
 	c.Assert(isL, Equals, false)
+	c.Assert(isH, Equals, true)
 }
 
 func (su *SimSuite) TestGetSliceSectionAllForward(c *C) {
 	es := CreateTestEvents(100, "x", "x", "x")
 
-	s, isF, isL := getSliceSection(es, nil, 100, "forward")
+	s, isF, isL, isH := getSliceSection(es, nil, 100, "forward")
 
 	c.Assert(s, HasLen, 100)
 	c.Assert(isF, Equals, true)
 	c.Assert(isL, Equals, true)
+	c.Assert(isH, Equals, true)
 	c.Assert(s[0].EventNumber, Equals, 0)
 	c.Assert(s[len(s)-1].EventNumber, Equals, 99)
 }
@@ -414,6 +425,7 @@ func (s *SimSuite) TestCreateFeedEntriesLast(c *C) {
 	url := fmt.Sprintf("%s/streams/%s/0/forward/20", server.URL, stream)
 	es := CreateTestEvents(100, stream, server.URL, "EventTypeX")
 	m, _ := CreateTestFeed(es, url)
+
 	c.Assert(m.Entry, HasLen, 20)
 	for k, v := range m.Entry {
 		num := (20 - 1) - k
@@ -427,6 +439,7 @@ func (s *SimSuite) TestCreateFeedEntries(c *C) {
 	url := fmt.Sprintf("%s/streams/%s/20/forward/20", server.URL, stream)
 	es := CreateTestEvents(100, stream, server.URL, "EventTypeX")
 	m, _ := CreateTestFeed(es, url)
+
 	c.Assert(m.Entry, HasLen, 20)
 	for k, v := range m.Entry {
 		num := (40 - 1) - k
@@ -448,6 +461,7 @@ func (s *SimSuite) TestCreateFeedEntriesHead(c *C) {
 	url := fmt.Sprintf("%s/streams/%s/head/backward/20", server.URL, stream)
 	es := CreateTestEvents(100, stream, server.URL, "EventTypeX")
 	m, _ := CreateTestFeed(es, url)
+
 	c.Assert(m.Entry, HasLen, 20)
 	for k, v := range m.Entry {
 		num := (len(es) - 1) - k
@@ -458,6 +472,7 @@ func (s *SimSuite) TestCreateFeedEntriesHead(c *C) {
 
 func (s *SimSuite) TestCreateEvents(c *C) {
 	es := CreateTestEvents(100, "astream", server.URL, "EventTypeX")
+
 	c.Assert(es, HasLen, 100)
 	for i := 0; i <= 99; i++ {
 		c.Assert(es[i].EventNumber, Equals, i)
@@ -467,9 +482,40 @@ func (s *SimSuite) TestCreateEvents(c *C) {
 func (s *SimSuite) TestReverseSlice(c *C) {
 	es := CreateTestEvents(100, "astream", server.URL, "EventTypeX")
 	rs := reverseEventSlice(es)
+
 	c.Assert(rs, HasLen, 100)
 	top := len(es) - 1
 	for i := 0; i <= top; i++ {
 		c.Assert(rs[i].EventNumber, Equals, top-i)
 	}
+}
+
+func (s *SimSuite) TestHeadOfStreamSetTrueWhenAtHeadOfStream(c *C) {
+	stream := "astream"
+	url := fmt.Sprintf("%s/streams/%s/90/forward/20", server.URL, stream)
+	es := CreateTestEvents(100, stream, server.URL, "EventTypeX")
+	m, _ := CreateTestFeed(es, url)
+
+	c.Assert(m.HeadOfStream, Equals, true)
+}
+
+// If the result is the first page but has not exceeded the number of events
+// the stream is not at the head of the stream. Only when the query exceeds the
+// number of results is the reader at the head of the stream
+func (s *SimSuite) TestHeadOfStreamSetFalseWhenNotAtHeadOfStream(c *C) {
+	stream := "astream"
+	url := fmt.Sprintf("%s/streams/%s/79/forward/20", server.URL, stream)
+	es := CreateTestEvents(100, stream, server.URL, "EventTypeX")
+	m, _ := CreateTestFeed(es, url)
+
+	c.Assert(m.HeadOfStream, Equals, false)
+}
+
+func (s *SimSuite) TestSetStreamID(c *C) {
+	stream := "some-stream"
+	url := fmt.Sprintf("%s/streams/%s/90/forward/20", server.URL, stream)
+	es := CreateTestEvents(100, stream, server.URL, "EventTypeX")
+	m, _ := CreateTestFeed(es, url)
+
+	c.Assert(m.StreamID, Equals, stream)
 }

@@ -124,7 +124,7 @@ func CreateTestFeed(es []*Event, feedURL string) (*atom.Feed, error) {
 	var nextVersion int
 	var lastVersion int
 
-	s, _, isLast := getSliceSection(es, r.Version, r.PageSize, r.Direction)
+	s, _, isLast, isHead := getSliceSection(es, r.Version, r.PageSize, r.Direction)
 	sr := reverseEventSlice(s)
 
 	lastVersion = es[0].EventNumber
@@ -158,6 +158,12 @@ func CreateTestFeed(es []*Event, feedURL string) (*atom.Feed, error) {
 	}
 	l = append(l, atom.Link{Href: fmt.Sprintf("%s/metadata", u), Rel: "metadata"})
 	f.Link = l
+
+	if isHead {
+		f.HeadOfStream = true
+	}
+
+	f.StreamID = r.Stream
 
 	for _, v := range sr {
 		e := &atom.Entry{}
@@ -305,20 +311,17 @@ func CreateTestEventAtomResponse(e *Event, tm *TimeStr) (*eventAtomResponse, err
 	return r, nil
 }
 
-func getSliceSection(es []*Event, ver *StreamVersion, pageSize int, direction string) ([]*Event, bool, bool) {
+func getSliceSection(es []*Event, ver *StreamVersion, pageSize int, direction string) (events []*Event, isFirst bool, isLast bool, isHead bool) {
 
 	if len(es) < 1 {
-		return []*Event{}, false, false
+		return []*Event{}, false, false, true
 	}
 
 	if ver != nil && ver.Number < 0 {
-
-		return nil, false, false
-
+		return nil, false, false, false
 	}
 
 	var start, end int
-	var f, l bool
 
 	switch direction {
 	case "forward":
@@ -327,9 +330,9 @@ func getSliceSection(es []*Event, ver *StreamVersion, pageSize int, direction st
 		} else {
 			start = ver.Number
 			if ver.Number > es[len(es)-1].EventNumber {
-				return []*Event{}, true, false // Out of range over
+				return []*Event{}, true, false, true // Out of range over
 			} else if ver.Number < es[0].EventNumber {
-				return []*Event{}, false, true //Out of range under
+				return []*Event{}, false, true, false //Out of range under
 			}
 		}
 		//if start + pageSize exceeds the last item, set end to be last item
@@ -343,23 +346,27 @@ func getSliceSection(es []*Event, ver *StreamVersion, pageSize int, direction st
 		}
 		//if end - pagesize is less than first item return first item
 		start = int(math.Max(float64(end-(pageSize)), 0.0))
-
 	}
 
 	if start <= 0 {
-		l = true
+		isLast = true
 	}
 	if end >= len(es)-1 {
-		f = true
+		isFirst = true
+	}
+	if end > len(es)-1 {
+		isHead = true
 	}
 
-	if l {
-		return es[:end], f, l
-	} else if f {
-		return es[start:], f, l
+	if isLast {
+		events = es[:end]
+	} else if isFirst {
+		events = es[start:]
 	} else {
-		return es[start:end], f, l
+		events = es[start:end]
 	}
+
+	return
 }
 
 func parseURL(u string) (*esRequest, error) {
