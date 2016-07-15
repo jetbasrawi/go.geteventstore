@@ -17,17 +17,11 @@ import (
 	"github.com/jetbasrawi/goes/internal/atom"
 )
 
-type invalidVersionError int
-
-func (i invalidVersionError) Error() string {
-	return fmt.Sprintf("%d is not a valid event number", i)
-}
-
 type esRequest struct {
 	Host      string
 	Stream    string
 	Direction string
-	Version   *StreamVersion
+	Version   int
 	PageSize  int
 }
 
@@ -38,11 +32,7 @@ type ESAtomFeedSimulator struct {
 }
 
 func (h ESAtomFeedSimulator) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-
 	ru := r.URL
-
-	//fmt.Printf("Request URL: %s\n", ru)
-
 	if !ru.IsAbs() {
 		ru = h.BaseURL.ResolveReference(ru)
 	}
@@ -55,7 +45,6 @@ func (h ESAtomFeedSimulator) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if fr.MatchString(ru.String()) {
-		//fmt.Printf("\nHandling URL: %s\n", r.URL.String())
 		f, err := CreateTestFeed(h.Events, ru.String())
 		if err != nil {
 			if serr, ok := err.(invalidVersionError); ok {
@@ -65,7 +54,6 @@ func (h ESAtomFeedSimulator) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 			return
 		}
-		//fmt.Println(f.PrettyPrint())
 		fmt.Fprint(w, f.PrettyPrint())
 	}
 
@@ -110,11 +98,6 @@ func (h ESAtomFeedSimulator) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func CreateTestFeed(es []*Event, feedURL string) (*atom.Feed, error) {
-
-	//fmt.Println("Creating test feed")
-	//fmt.Printf("URL %s\n", feedURL)
-	//spew.Dump(es)
-
 	r, err := parseURL(feedURL)
 	if err != nil {
 		return nil, err
@@ -311,13 +294,13 @@ func CreateTestEventAtomResponse(e *Event, tm *TimeStr) (*eventAtomResponse, err
 	return r, nil
 }
 
-func getSliceSection(es []*Event, ver *StreamVersion, pageSize int, direction string) (events []*Event, isFirst bool, isLast bool, isHead bool) {
+func getSliceSection(es []*Event, ver int, pageSize int, direction string) (events []*Event, isFirst bool, isLast bool, isHead bool) {
 
 	if len(es) < 1 {
 		return []*Event{}, false, false, true
 	}
 
-	if ver != nil && ver.Number < 0 {
+	if ver < 0 {
 		return nil, false, false, false
 	}
 
@@ -325,13 +308,13 @@ func getSliceSection(es []*Event, ver *StreamVersion, pageSize int, direction st
 
 	switch direction {
 	case "forward":
-		if ver == nil {
+		if ver == 0 {
 			start = 0
 		} else {
-			start = ver.Number
-			if ver.Number > es[len(es)-1].EventNumber {
+			start = ver
+			if ver > es[len(es)-1].EventNumber {
 				return []*Event{}, true, false, true // Out of range over
-			} else if ver.Number < es[0].EventNumber {
+			} else if ver < es[0].EventNumber {
 				return []*Event{}, false, true, false //Out of range under
 			}
 		}
@@ -339,10 +322,10 @@ func getSliceSection(es []*Event, ver *StreamVersion, pageSize int, direction st
 		end = int(math.Min(float64(start+pageSize), float64(len(es))))
 
 	case "backward", "":
-		if ver == nil {
+		if ver == 0 {
 			end = len(es)
 		} else {
-			end = ver.Number + 1
+			end = ver + 1
 		}
 		//if end - pagesize is less than first item return first item
 		start = int(math.Max(float64(end-(pageSize)), 0.0))
@@ -369,6 +352,7 @@ func getSliceSection(es []*Event, ver *StreamVersion, pageSize int, direction st
 	return
 }
 
+// Extracts relevant parameters from URL and returns them in an esRequest
 func parseURL(u string) (*esRequest, error) {
 
 	r := esRequest{}
@@ -388,7 +372,7 @@ func parseURL(u string) (*esRequest, error) {
 			if i < 0 {
 				return nil, invalidVersionError(i)
 			}
-			r.Version = &StreamVersion{Number: int(i)}
+			r.Version = int(i)
 		}
 		r.Direction = split[3]
 		p, err := strconv.ParseInt(split[4], 0, 0)

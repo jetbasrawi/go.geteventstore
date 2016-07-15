@@ -101,12 +101,12 @@ func (s *EventSuite) TestAppendEventsWithExpectedVersion(c *C) {
 	stream := "Some-Stream"
 	url := fmt.Sprintf("/streams/%s", stream)
 
-	expectedVersion := &StreamVersion{Number: 5}
+	expectedVersion := 5
 
 	mux.HandleFunc(url, func(w http.ResponseWriter, r *http.Request) {
 		c.Assert(r.Method, Equals, "POST")
 
-		want := strconv.Itoa(expectedVersion.Number)
+		want := strconv.Itoa(expectedVersion)
 		got := r.Header.Get("ES-ExpectedVersion")
 		c.Assert(got, Equals, want)
 
@@ -115,7 +115,7 @@ func (s *EventSuite) TestAppendEventsWithExpectedVersion(c *C) {
 	})
 
 	streamWriter := client.NewStreamWriter(stream)
-	resp, err := streamWriter.Append(expectedVersion, ev)
+	resp, err := streamWriter.Append(&expectedVersion, ev)
 	c.Assert(err, NotNil)
 	c.Assert(resp.StatusMessage, Equals, "400 Bad Request")
 	c.Assert(resp.StatusCode, Equals, http.StatusBadRequest)

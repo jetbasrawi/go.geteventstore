@@ -7,7 +7,7 @@ import (
 
 //StreamWriter
 type StreamWriter interface {
-	Append(*StreamVersion, ...*Event) (*Response, error)
+	Append(*int, ...*Event) (*Response, error)
 }
 
 type streamWriter struct {
@@ -24,7 +24,7 @@ type streamWriter struct {
 // -2 : The write should never conflict with anything and should always succeed
 // -1 : The stream should not exist at the time of writing. This write will create it.
 //  0 : The stream should exist but it should be empty
-func (s *streamWriter) Append(expectedVersion *StreamVersion, events ...*Event) (*Response, error) {
+func (s *streamWriter) Append(expectedVersion *int, events ...*Event) (*Response, error) {
 
 	u := fmt.Sprintf("/streams/%s", s.streamName)
 
@@ -33,10 +33,11 @@ func (s *streamWriter) Append(expectedVersion *StreamVersion, events ...*Event) 
 		return nil, err
 	}
 
+	//TODO: review this
 	req.Header.Set("Content-Type", "application/vnd.eventstore.events+json")
 
 	if expectedVersion != nil {
-		req.Header.Set("ES-ExpectedVersion", strconv.Itoa(expectedVersion.Number))
+		req.Header.Set("ES-ExpectedVersion", strconv.Itoa(*expectedVersion))
 	}
 
 	resp, err := s.client.do(req, nil)

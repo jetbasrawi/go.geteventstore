@@ -7,7 +7,6 @@ package goes
 import (
 	"bytes"
 	"encoding/xml"
-	"errors"
 	"fmt"
 	"io"
 	"strconv"
@@ -15,6 +14,12 @@ import (
 
 	"github.com/jetbasrawi/goes/internal/atom"
 )
+
+type invalidVersionError int
+
+func (i invalidVersionError) Error() string {
+	return fmt.Sprintf("%d is not a valid event number", i)
+}
 
 type NoMoreEventsError struct{}
 
@@ -48,9 +53,9 @@ func (e TemporarilyUnavailableError) Error() string {
 // -2 : The write should never conflict with anything and should always succeed
 // -1 : The stream should not exist at the time of writing. This write will create it.
 //  0 : The stream should exist but it should be empty
-type StreamVersion struct {
-	Number int
-}
+//type StreamVersion struct {
+//Number int
+//}
 
 // Take is used to specify the number of events that should be returned in a
 // request to read events from a stream.
@@ -65,8 +70,8 @@ type MetaData struct {
 	Data      interface{} `json:"data"`
 }
 
-// readStream is a reads a stream atom feed page specified by the url.
-// returns a *atom.Feed object
+// readStream reads a stream atom feed page specified by the url.
+// returns an *atom.Feed object
 //
 // The feed object returned may be nil in case of an error.
 // The *Response may also be nil if the error occurred before the http request.
@@ -104,7 +109,7 @@ func (c *Client) readStream(url string) (*atom.Feed, *Response, error) {
 // http://docs.geteventstore.com/http-api/3.7.0/stream-metadata/
 func (c *Client) getMetadataURL(stream string) (string, *Response, error) {
 
-	url, err := getFeedURL(stream, "backward", nil, nil, 1)
+	url, err := getFeedURL(stream, "backward", 0, nil, 1)
 	if err != nil {
 		return "", nil, err
 	}
@@ -148,7 +153,10 @@ func getEventURLs(f *atom.Feed) ([]string, error) {
 //
 // If version, take an direction are all nil or empty, the url returned will be
 // to read from the head of the stream backward with a page size of 100
-func getFeedURL(stream, direction string, version *StreamVersion, take *Take, pageSize int) (string, error) {
+func getFeedURL(stream, direction string, version int, take *Take, pageSize int) (string, error) {
+
+	fmt.Printf("Get feed url, %d %s\n", version, direction)
+
 	ps := pageSize
 	if take != nil && take.Number < ps {
 		ps = take.Number
@@ -157,7 +165,7 @@ func getFeedURL(stream, direction string, version *StreamVersion, take *Take, pa
 	dir := ""
 	switch direction {
 	case "":
-		if version != nil && version.Number == 0 {
+		if version == 0 {
 			dir = "forward"
 		} else {
 			dir = "backward"
@@ -166,18 +174,14 @@ func getFeedURL(stream, direction string, version *StreamVersion, take *Take, pa
 	case "forward", "backward":
 		dir = direction
 	default:
-		return "", errors.New("Invalid Direction")
+		return "", fmt.Errorf("Invalid Direction %s\n", direction)
 	}
 
 	ver := "head"
-	if version != nil {
-		if version.Number < 0 {
-			return "", invalidVersionError(version.Number)
-		}
-		ver = strconv.Itoa(version.Number)
-	} else if dir == "forward" {
-		ver = "0"
+	if version < 0 {
+		return "", invalidVersionError(version)
 	}
+	ver = strconv.Itoa(version)
 
 	return fmt.Sprintf("/streams/%s/%s/%s/%d", stream, ver, dir, ps), nil
 }

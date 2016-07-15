@@ -61,7 +61,7 @@ func (s *SimSuite) TestGetFeedWithNoEntries(c *C) {
 func (s *SimSuite) TestGetSliceSectionForwardFromZero(c *C) {
 	es := CreateTestEvents(1000, "x", "x", "x")
 
-	sl, isF, isL, isH := getSliceSection(es, &StreamVersion{Number: 0}, 100, "forward")
+	sl, isF, isL, isH := getSliceSection(es, 0, 100, "forward")
 
 	c.Assert(sl, HasLen, 100)
 	c.Assert(isF, Equals, false)
@@ -75,7 +75,7 @@ func (s *SimSuite) TestGetSliceSectionForwardFromZero(c *C) {
 func (su *SimSuite) TestGetSliceSectionForward(c *C) {
 	es := CreateTestEvents(100, "x", "x", "x")
 
-	s, isF, isL, isH := getSliceSection(es, &StreamVersion{Number: 25}, 50, "forward")
+	s, isF, isL, isH := getSliceSection(es, 25, 50, "forward")
 
 	c.Assert(s, HasLen, 50)
 	c.Assert(isF, Equals, false)
@@ -90,7 +90,7 @@ func (su *SimSuite) TestGetSliceSectionForward(c *C) {
 func (su *SimSuite) TestGetSliceSectionBackward(c *C) {
 	es := CreateTestEvents(100, "x", "x", "x")
 
-	s, isF, isL, isH := getSliceSection(es, &StreamVersion{Number: 75}, 50, "backward")
+	s, isF, isL, isH := getSliceSection(es, 75, 50, "backward")
 
 	c.Assert(s, HasLen, 50)
 	c.Assert(isF, Equals, false)
@@ -105,7 +105,7 @@ func (su *SimSuite) TestGetSliceSectionBackward(c *C) {
 func (su *SimSuite) TestGetSliceSectionBackwardUnder(c *C) {
 	es := CreateTestEvents(100, "x", "x", "x")
 
-	s, isF, isL, isH := getSliceSection(es, &StreamVersion{Number: 25}, 50, "backward")
+	s, isF, isL, isH := getSliceSection(es, 25, 50, "backward")
 
 	c.Assert(s, HasLen, 26)
 	c.Assert(isF, Equals, false)
@@ -121,7 +121,7 @@ func (su *SimSuite) TestGetSliceSectionBackwardUnder(c *C) {
 func (su *SimSuite) TestGetSliceSectionForwardOut(c *C) {
 	es := CreateTestEvents(100, "x", "x", "x")
 
-	s, isF, isL, isH := getSliceSection(es, &StreamVersion{Number: 101}, 50, "forward")
+	s, isF, isL, isH := getSliceSection(es, 101, 50, "forward")
 
 	c.Assert(s, HasLen, 0)
 	c.Assert(isF, Equals, true)
@@ -135,7 +135,7 @@ func (su *SimSuite) TestGetSliceSectionForwardOut(c *C) {
 func (su *SimSuite) TestGetSliceSectionForwardOver(c *C) {
 	es := CreateTestEvents(100, "x", "x", "x")
 
-	s, isF, isL, isH := getSliceSection(es, &StreamVersion{Number: 75}, 50, "forward")
+	s, isF, isL, isH := getSliceSection(es, 75, 50, "forward")
 	c.Assert(s, HasLen, 25)
 	c.Assert(isF, Equals, true)
 	c.Assert(isL, Equals, false)
@@ -148,7 +148,7 @@ func (su *SimSuite) TestGetSliceSectionForwardOver(c *C) {
 func (su *SimSuite) TestGetSliceSectionTail(c *C) {
 	es := CreateTestEvents(100, "x", "x", "x")
 
-	s, isF, isL, isH := getSliceSection(es, &StreamVersion{Number: 100}, 20, "forward")
+	s, isF, isL, isH := getSliceSection(es, 100, 20, "forward")
 
 	c.Assert(s, HasLen, 0)
 	c.Assert(isF, Equals, true)
@@ -159,7 +159,7 @@ func (su *SimSuite) TestGetSliceSectionTail(c *C) {
 func (su *SimSuite) TestGetSliceSectionAllForward(c *C) {
 	es := CreateTestEvents(100, "x", "x", "x")
 
-	s, isF, isL, isH := getSliceSection(es, nil, 100, "forward")
+	s, isF, isL, isH := getSliceSection(es, 0, 100, "forward")
 
 	c.Assert(s, HasLen, 100)
 	c.Assert(isF, Equals, true)
@@ -172,18 +172,18 @@ func (su *SimSuite) TestGetSliceSectionAllForward(c *C) {
 func (s *SimSuite) TestParseURLVersioned(c *C) {
 	srv := "http://localhost:2113"
 	stream := "An-Qw3334rd-St333"
-	ver := &StreamVersion{Number: 50}
+	ver := 50
 	direction := "backward"
 	pageSize := 10
 
-	url := fmt.Sprintf("%s/streams/%s/%d/%s/%d", srv, stream, ver.Number, direction, pageSize)
+	url := fmt.Sprintf("%s/streams/%s/%d/%s/%d", srv, stream, ver, direction, pageSize)
 
 	er, err := parseURL(url)
 
 	c.Assert(err, IsNil)
 	c.Assert(er.Host, Equals, srv)
 	c.Assert(er.Stream, Equals, stream)
-	c.Assert(er.Version.Number, Equals, ver.Number)
+	c.Assert(er.Version, Equals, ver)
 	c.Assert(er.Direction, Equals, direction)
 	c.Assert(er.PageSize, Equals, pageSize)
 }
@@ -214,7 +214,7 @@ func (s *SimSuite) TestParseURLBase(c *C) {
 	c.Assert(err, IsNil)
 	c.Assert(er.Host, Equals, srv)
 	c.Assert(er.Stream, Equals, stream)
-	c.Assert(er.Version, IsNil)
+	c.Assert(er.Version, Equals, 0)
 	c.Assert(er.Direction, Equals, direction)
 	c.Assert(er.PageSize, Equals, pageSize)
 }
@@ -232,7 +232,7 @@ func (s *SimSuite) TestParseURLHead(c *C) {
 	c.Assert(err, IsNil)
 	c.Assert(er.Host, Equals, srv)
 	c.Assert(er.Stream, Equals, stream)
-	c.Assert(er.Version, IsNil)
+	c.Assert(er.Version, Equals, 0)
 	c.Assert(er.Direction, Equals, direction)
 	c.Assert(er.PageSize, Equals, pageSize)
 }

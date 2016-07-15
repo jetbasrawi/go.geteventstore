@@ -138,7 +138,7 @@ func (this *streamReader) Next() bool {
 		url, err := getFeedURL(
 			this.streamName,
 			"forward",
-			&StreamVersion{Number: this.nextVersion},
+			this.nextVersion,
 			nil,
 			this.pageSize,
 		)
@@ -147,7 +147,6 @@ func (this *streamReader) Next() bool {
 			return false
 		}
 		this.currentURL = url
-		//fmt.Println(url)
 	}
 
 	// If the index is less than 0 load the previous feed page.
@@ -218,7 +217,6 @@ func (this *streamReader) Next() bool {
 	}
 
 	//There are events returned, get the event for the current version
-	//fmt.Printf("index %d numEntries %d\n", this.index, numEntries)
 	entry := this.feedPage.Entry[this.index]
 	url := strings.TrimRight(entry.Link[1].Href, "/")
 	e, _, err := this.client.GetEvent(url)
