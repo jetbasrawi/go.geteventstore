@@ -1,4 +1,5 @@
 // The simhandler simulates the EventStore ATOM feeds for streams.
+
 package goes
 
 import (
@@ -12,8 +13,10 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/jetbasrawi/goes/internal/atom"
 )
 
@@ -25,27 +28,68 @@ type esRequest struct {
 	PageSize  int
 }
 
-type ESAtomFeedSimulator struct {
-	Events   []*Event
-	BaseURL  *url.URL
-	MetaData *Event
+// AtomFeedSimulator is the type that stores configuration and state for
+// the feed simulator
+type AtomFeedSimulator struct {
+	sync.Mutex
+	Events       []*Event
+	BaseURL      *url.URL
+	MetaData     *Event
+	feedRegex    *regexp.Regexp
+	eventRegex   *regexp.Regexp
+	metaRegex    *regexp.Regexp
+	trickleAfter int
 }
 
-func (h ESAtomFeedSimulator) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	ru := r.URL
-	if !ru.IsAbs() {
-		ru = h.BaseURL.ResolveReference(ru)
+// NewAtomFeedSimulator consructs a new AtomFeedSimulator
+func NewAtomFeedSimulator(events []*Event, baseURL *url.URL, streamMeta *Event, trickleAfter int) (*AtomFeedSimulator, error) {
+	fs := &AtomFeedSimulator{
+		Events:       events,
+		BaseURL:      baseURL,
+		MetaData:     streamMeta,
+		trickleAfter: trickleAfter,
 	}
 
-	// Feed Request
 	fr, err := regexp.Compile("(?:streams\\/[^\\/]+\\/(?:head|\\d+)\\/(?:forward|backward)\\/\\d+)|(?:streams\\/[^\\/]+$)")
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return nil, err
+	}
+	fs.feedRegex = fr
+
+	er, err := regexp.Compile("streams\\/[^\\/]+\\/\\d+\\/?$")
+	if err != nil {
+		return nil, err
+	}
+	fs.eventRegex = er
+
+	mr, err := regexp.Compile("streams\\/[^\\/]+\\/metadata")
+	if err != nil {
+		return nil, err
+	}
+	fs.metaRegex = mr
+
+	return fs, nil
+}
+
+// ServeHTTP serves atom feed responses
+func (h *AtomFeedSimulator) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	reqURL := r.URL
+	if !reqURL.IsAbs() {
+		reqURL = h.BaseURL.ResolveReference(reqURL)
 	}
 
-	if fr.MatchString(ru.String()) {
-		f, err := CreateTestFeed(h.Events, ru.String())
+	longPoll := r.Header.Get("ES-LongPoll")
+
+	// Feed Request
+	if h.feedRegex.MatchString(reqURL.String()) {
+
+		fmt.Printf("Trickle1 %d\n", h.trickleAfter)
+		index := h.trickleAfter
+		if index < 0 {
+			index = 0
+		}
+
+		f, err := CreateTestFeed(h.Events[:index], reqURL.String())
 		if err != nil {
 			if serr, ok := err.(invalidVersionError); ok {
 				http.Error(w, serr.Error(), http.StatusBadRequest)
@@ -54,17 +98,38 @@ func (h ESAtomFeedSimulator) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 			return
 		}
+
+		if len(f.Entry) <= 0 && r.Header.Get("ES-LongPoll") != "" {
+
+			fmt.Printf("Trickle2 %d\n", h.trickleAfter)
+
+			h.Lock()
+			h.trickleAfter++
+			// r, err := parseURL(reqURL.String())
+			index := h.trickleAfter
+			if index < 0 {
+				index = 0
+			}
+			fmt.Printf("ES-LongPoll %s, index %d lenEvents-1 %d\n", longPoll, index, len(h.Events)-1)
+
+			f, err = CreateTestFeed(h.Events[:index], reqURL.String())
+			h.Unlock()
+			if err != nil {
+				if serr, ok := err.(invalidVersionError); ok {
+					http.Error(w, serr.Error(), http.StatusBadRequest)
+				} else {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+				}
+				return
+			}
+			time.Sleep(time.Duration(2) * time.Second)
+		}
 		fmt.Fprint(w, f.PrettyPrint())
 	}
 
 	//Event request
-	er, err := regexp.Compile("streams\\/[^\\/]+\\/\\d+\\/?$")
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if er.MatchString(ru.String()) {
-		e, err := resolveEvent(h.Events, ru.String())
+	if h.eventRegex.MatchString(reqURL.String()) {
+		e, err := resolveEvent(h.Events, reqURL.String())
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
@@ -78,12 +143,7 @@ func (h ESAtomFeedSimulator) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	//Metadata request
-	mr, err := regexp.Compile("streams\\/[^\\/]+\\/metadata")
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if mr.MatchString(ru.String()) {
+	if h.metaRegex.MatchString(reqURL.String()) {
 		if h.MetaData == nil {
 			fmt.Fprint(w, "{}")
 			return
@@ -97,7 +157,20 @@ func (h ESAtomFeedSimulator) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// CreateTestFeed creates an atom feed object from the events passed in and the
+// url provided.
+//
+// The function will take the events that correspond to the version number and
+// page size in the url and return a feed object that contains those events.
+// If the url defines a set larger than the events passed in the returned events
+// will only contain the events available.
 func CreateTestFeed(es []*Event, feedURL string) (*atom.Feed, error) {
+
+	if len(es) <= 0 {
+		spew.Dump(es)
+		fmt.Println(feedURL)
+	}
+
 	r, err := parseURL(feedURL)
 	if err != nil {
 		return nil, err
@@ -160,9 +233,15 @@ func CreateTestFeed(es []*Event, feedURL string) (*atom.Feed, error) {
 		f.Entry = append(f.Entry, e)
 	}
 
+	fmt.Printf("CreateTestFeed numEvents %d %s returned %d\n", len(es), feedURL, len(f.Entry))
+
 	return f, nil
 }
 
+// CreateTestEventFromData returns test events derived from the user specified data
+//
+// Should be used where you require the simulator to return events of your own type
+// with your own content.
 func CreateTestEventFromData(stream, server string, eventNumber int, data interface{}, meta interface{}) *Event {
 	e := Event{}
 	e.EventStreamID = stream
@@ -196,6 +275,15 @@ func CreateTestEventFromData(stream, server string, eventNumber int, data interf
 	}
 	return &e
 }
+
+// CreateTestEvent will generate a test event.
+//
+// The event data and meta will be a *json.RawMessage.
+// The type of the event returned will be derived from the eventType argument.
+// The event will have a single field named Foo which will contain random content
+// which is simply a uuid string.
+// The meta returned will contain a single field named Bar which will also contain
+// a uuid string.
 func CreateTestEvent(stream, server, eventType string, eventNumber int, data *json.RawMessage, meta *json.RawMessage) *Event {
 	e := Event{}
 	e.EventStreamID = stream
@@ -224,6 +312,8 @@ func CreateTestEvent(stream, server, eventType string, eventNumber int, data *js
 	return &e
 }
 
+// CreateTestEvents will return a slice of random test events. The types of the events will
+// be randomly selected from the event type names passed in to the variadic argument eventTypes
 func CreateTestEvents(numEvents int, stream string, server string, eventTypes ...string) []*Event {
 	se := []*Event{}
 	for i := 0; i < numEvents; i++ {
@@ -244,6 +334,11 @@ func CreateTestEvents(numEvents int, stream string, server string, eventTypes ..
 	return se
 }
 
+// CreateTestEventResponse will return an *EventResponse containing the event provided in the
+// argument e.
+//
+// The Updated field of the EventResponse will be set to the value of ht TimeString tm if it is
+// provided otherwise it will be set to time.Now
 func CreateTestEventResponse(e *Event, tm *TimeStr) *EventResponse {
 
 	timeStr := Time(time.Now())
@@ -262,6 +357,11 @@ func CreateTestEventResponse(e *Event, tm *TimeStr) *EventResponse {
 	return r
 }
 
+// CreateTestEventResponses will return a slice of *EventResponse containing the events provided in the
+// argument events.
+//
+// The Updated field of the EventResponse will be set to the value of ht TimeString tm if it is
+// provided otherwise it will be set to time.Now
 func CreateTestEventResponses(events []*Event, tm *TimeStr) []*EventResponse {
 	ret := make([]*EventResponse, len(events))
 	for k, v := range events {
@@ -270,6 +370,10 @@ func CreateTestEventResponses(events []*Event, tm *TimeStr) []*EventResponse {
 	return ret
 }
 
+// CreateTestEventAtomResponse returns an *eventAtomResponse derived from the *Event argument e.
+//
+// The updated time of the response will be set to the value of the *TimeStr argument tm. If tm is
+// nil then the updated time will be set to now.
 func CreateTestEventAtomResponse(e *Event, tm *TimeStr) (*eventAtomResponse, error) {
 
 	b, err := json.Marshal(e)
@@ -378,9 +482,8 @@ func parseURL(u string) (*esRequest, error) {
 		p, err := strconv.ParseInt(split[4], 0, 0)
 		if err != nil {
 			return nil, err
-		} else {
-			r.PageSize = int(p)
 		}
+		r.PageSize = int(p)
 	} else {
 		r.Direction = "backward"
 		r.PageSize = 20

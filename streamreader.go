@@ -216,6 +216,9 @@ func (this *streamReader) Next() bool {
 		return true
 	}
 
+	// prev := this.feedPage.GetLink("previous")
+	// fmt.Println(prev)
+
 	//There are events returned, get the event for the current version
 	entry := this.feedPage.Entry[this.index]
 	url := strings.TrimRight(entry.Link[1].Href, "/")

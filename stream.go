@@ -155,8 +155,6 @@ func getEventURLs(f *atom.Feed) ([]string, error) {
 // to read from the head of the stream backward with a page size of 100
 func getFeedURL(stream, direction string, version int, take *Take, pageSize int) (string, error) {
 
-	fmt.Printf("Get feed url, %d %s\n", version, direction)
-
 	ps := pageSize
 	if take != nil && take.Number < ps {
 		ps = take.Number

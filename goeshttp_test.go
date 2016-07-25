@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -53,7 +54,10 @@ func setup() {
 
 func setupSimulator(es []*Event, m *Event) {
 	u, _ := url.Parse(server.URL)
-	handler := ESAtomFeedSimulator{Events: es, BaseURL: u, MetaData: m}
+	handler, err := NewAtomFeedSimulator(es, u, m, len(es))
+	if err != nil {
+		log.Fatal(err)
+	}
 	mux.Handle("/", handler)
 }
 

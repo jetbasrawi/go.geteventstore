@@ -3,6 +3,8 @@ package goes
 import (
 	"encoding/json"
 	"fmt"
+	"log"
+	"net/url"
 	"time"
 
 	. "gopkg.in/check.v1"
@@ -518,4 +520,51 @@ func (s *SimSuite) TestSetStreamID(c *C) {
 	m, _ := CreateTestFeed(es, url)
 
 	c.Assert(m.StreamID, Equals, stream)
+}
+
+func (s *SimSuite) TestTrickleFeed(c *C) {
+
+	stream := "trickle-stream"
+	es := CreateTestEvents(10, stream, server.URL, "EventTypeX")
+
+	u, _ := url.Parse(server.URL)
+	handler, err := NewAtomFeedSimulator(es, u, nil, 5)
+	if err != nil {
+		log.Fatal(err)
+	}
+	mux.Handle("/", handler)
+
+	reader := client.NewStreamReader(stream)
+
+	count := 0
+	// start := time.Now()
+	for reader.Next() {
+
+		fmt.Printf("Call Next count %d lenes-1 %d trickle %d\n", count, len(es)-1, handler.trickleAfter)
+
+		if count > len(es)-1 {
+			return
+		}
+
+		if reader.EventResponse() != nil {
+			fmt.Printf("EventNumber %d\n", reader.EventResponse().Event.EventNumber)
+		}
+
+		if count < 5 {
+			c.Assert(reader.Err(), Equals, nil)
+			c.Assert(reader.EventResponse, NotNil)
+		} else if count == 5 {
+			fmt.Println("Count 5 NoEvents")
+			c.Assert(typeOf(reader.Err()), Equals, "NoMoreEventsError")
+			reader.LongPoll(5)
+		} else if count > 5 && count < 10 {
+			fmt.Printf("> 5  Error: %#v EventResp %#v\n", reader.Err(), reader.EventResponse())
+			c.Assert(reader.Err(), Equals, nil)
+			// reader.LongPoll(5)
+
+		}
+
+		count++
+		// start = time.Now()
+	}
 }

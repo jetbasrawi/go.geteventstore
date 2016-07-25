@@ -25,7 +25,7 @@ func init() {
 	u, _ := url.Parse(server.URL)
 	es := goes.CreateTestEvents(25, "FooStream", server.URL, "FooEvent")
 
-	handler := goes.ESAtomFeedSimulator{Events: es, BaseURL: u}
+	handler := goes.NewAtomFeedSimulator(es, u, nil)
 	mux.Handle("/", handler)
 }
 
