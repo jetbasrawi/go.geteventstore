@@ -11,8 +11,9 @@ import (
 )
 
 var (
-	mux    *http.ServeMux
-	server *httptest.Server
+	mux       *http.ServeMux
+	server    *httptest.Server
+	numEvents = 25
 )
 
 func init() {
@@ -23,12 +24,16 @@ func init() {
 	server = httptest.NewServer(mux)
 
 	u, _ := url.Parse(server.URL)
-	es := goes.CreateTestEvents(25, "FooStream", server.URL, "FooEvent")
+	es := goes.CreateTestEvents(numEvents, "FooStream", server.URL, "FooEvent")
 
-	handler := goes.NewAtomFeedSimulator(es, u, nil)
+	handler, err := goes.NewAtomFeedSimulator(es, u, nil, 10)
+	if err != nil {
+		log.Fatal(err)
+	}
 	mux.Handle("/", handler)
 }
 
+// FooEvent is a struct to hold test event data
 type FooEvent struct {
 	Foo string `json:"foo"`
 }
@@ -38,7 +43,7 @@ func main() {
 	// Create a client providing the full URL to your eventstore server
 	client, err := goes.NewClient(nil, server.URL)
 	if err != nil {
-		//TODO:
+		log.Fatal(err)
 	}
 
 	streamName := "FooStream"
@@ -49,6 +54,7 @@ func main() {
 	// The reader will default to version 0 and the first event returned in that
 	// case will be the event at 0 on the stream. To begin reading from a
 	// specific version call the NextVersion(int) method.
+	// In this case the reader will begin reading at event number 5
 	reader.NextVersion(5)
 
 	// Basic Authentication credentials can be set on the client.
@@ -57,6 +63,8 @@ func main() {
 	// will use the new credentials. There is no need to create a new client
 	// or stream reader.
 	client.SetBasicAuth("admin", "changeit")
+
+	log.Printf("\n\n Will begin reading stream.\n\n")
 
 	// By default the first call to next on the stream reader will start
 	// cue up the event at version 0 if there are events to return
@@ -87,14 +95,14 @@ func main() {
 			// If a stream is not found a StreamDoesNotExistError is returned.
 			// In this example we will retry after some duration expecting that
 			// the stream will be created eventually.
-			case *goes.StreamDoesNotExistError:
+			case *goes.NotFoundError:
 				<-time.After(time.Duration(10) * time.Second)
 
 			// If the request is not authorised to read from the stream an
 			// UnauthorizedError will be returned. For this example we assume
 			// that this is not recoverable and we exit.
 			case *goes.UnauthorizedError:
-				log.Fatal("Not authorized to connect to the stream %s", streamName)
+				log.Fatalf("Not authorized to connect to the stream %s", streamName)
 
 			// When there are no events returned from the request a
 			// NoMoreEventsError is returned. This may happen when requesting
@@ -109,8 +117,13 @@ func main() {
 			// enumerate over the events in a stream and then to LongPoll when
 			// there are no more events to return.
 			case *goes.NoMoreEventsError:
+				// if reader.Version() >= numEvents-1 {
+				// 	log.Println("Finished polling head of stream. Exiting.")
+				// 	return
+				// }
+
 				log.Println("No more events. Will poll head of stream.")
-				reader.LongPoll(15)
+				reader.LongPoll(5)
 
 			// Handle unexpected errors
 			default:
@@ -148,7 +161,7 @@ func main() {
 				log.Fatal(err)
 			}
 
-			log.Printf("Event returned %#v\n Meta returned %#v\n", fooEvent, fooMeta)
+			log.Printf("\n Event %d returned %#v\n Meta returned %#v\n\n", reader.EventResponse().Event.EventNumber, fooEvent, fooMeta)
 		}
 	}
 }

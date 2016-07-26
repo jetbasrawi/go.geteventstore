@@ -6,11 +6,14 @@
 package goes
 
 import (
-	"bytes"
 	"encoding/json"
-	"io"
 	"time"
 )
+
+// TODO: Check this is being used
+type EventFactory interface {
+	GetEvent(string) interface{}
+}
 
 // EventResponse encapsulates the response for an event reflecting the atom
 // response returned from the server which contains data in addition to the
@@ -94,105 +97,23 @@ type Link struct {
 // TimeStr is a type used to format feed dates.
 type TimeStr string
 
+// Time returns a TimeStr version of the time.Time argument t
 func Time(t time.Time) TimeStr {
 	return TimeStr(t.Format("2006-01-02T15:04:05-07:00"))
-}
-
-type EventFactory interface {
-	GetEvent(string) interface{}
 }
 
 // NewEvent creates a new event object.
 //
 // If an empty eventId is provided an eventId will be generated
 // and retured in the event.
-func ToEventData(eventId, eventType string, data interface{}, meta interface{}) *Event {
+func ToEventData(eventID, eventType string, data interface{}, meta interface{}) *Event {
 	e := &Event{EventType: eventType}
-	if eventId == "" {
+	if eventID == "" {
 		e.EventID = NewUUID()
 	} else {
-		e.EventID = eventId
+		e.EventID = eventID
 	}
 	e.Data = data
 	e.MetaData = meta
 	return e
-}
-
-// GetEvents gets all the events specified in the urls argument.
-//
-// The event slice will be nil in an error case.
-// *Response may be nil if an error occurs before the http request. Otherwise
-// it will contain the raw http response and status.
-// If an error occurs during the http request an *ErrorResponse will be returned
-// as the error. The *ErrorResponse will contain the raw http response and status
-// and a description of the error.
-func (c *Client) GetEvents(urls []string) ([]*EventResponse, *Response, error) {
-	s := make([]*EventResponse, len(urls))
-	for i := 0; i < len(urls); i++ {
-		e, resp, err := c.GetEvent(urls[i])
-		if err != nil {
-			return nil, resp, err
-		}
-		s[i] = e
-	}
-	return s, nil, nil
-}
-
-// GetEvent gets a single event
-//
-// The event response will be nil in an error case.
-// *Response may be nil if an error occurs before the http request. Otherwise
-// it will contain the raw http response and status.
-// If an error occurs during the http request an *ErrorResponse will be returned
-// as the error. The *ErrorResponse will contain the raw http response and status
-// and a description of the error.
-func (c *Client) GetEvent(url string) (*EventResponse, *Response, error) {
-
-	r, err := c.newRequest("GET", url, nil)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	r.Header.Set("Accept", "application/vnd.eventstore.atom+json")
-
-	var b bytes.Buffer
-	resp, err := c.do(r, &b)
-	if err != nil {
-		return nil, resp, err
-	}
-
-	if b.String() == "{}" {
-		return nil, resp, nil
-	}
-	var raw json.RawMessage
-	er := &eventAtomResponse{Content: &raw}
-	err = json.NewDecoder(bytes.NewReader(b.Bytes())).Decode(er)
-	if err == io.EOF {
-		return nil, resp, nil
-	}
-
-	if err != nil {
-		return nil, resp, err
-	}
-
-	var d json.RawMessage
-	var m json.RawMessage
-	ev := &Event{Data: &d, MetaData: &m}
-
-	err = json.Unmarshal(raw, ev)
-	if err == io.EOF {
-		err = nil
-	}
-	if err != nil {
-		return nil, resp, err
-	}
-
-	e := EventResponse{}
-	e.Title = er.Title
-	e.ID = er.ID
-	e.Updated = er.Updated
-	e.Summary = er.Summary
-	e.Event = ev
-
-	return &e, resp, nil
 }

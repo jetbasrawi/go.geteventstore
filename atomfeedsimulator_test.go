@@ -2,6 +2,7 @@ package goes
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/url"
@@ -20,6 +21,18 @@ func (s *SimSuite) SetUpTest(c *C) {
 
 func (s *SimSuite) TearDownTest(c *C) {
 	teardown()
+}
+
+// Test that an attempt to construct a simulator with no events returns an error
+func (s *SimSuite) TestCreateSimulatorWithNoEventsReturnsError(c *C) {
+	stream := "noevents-stream"
+	es := CreateTestEvents(0, stream, server.URL, "EventTypeY")
+
+	handler, err := NewAtomFeedSimulator(es, nil, nil, 0)
+
+	c.Assert(err, NotNil)
+	c.Assert(err, DeepEquals, errors.New("Must provide one or more events."))
+	c.Assert(handler, IsNil)
 }
 
 func (s *SimSuite) TestGetEventResponse(c *C) {
@@ -56,119 +69,114 @@ func (s *SimSuite) TestResolveEvent(c *C) {
 	c.Assert(got, DeepEquals, es[9])
 }
 
-func (s *SimSuite) TestGetFeedWithNoEntries(c *C) {
-	//TODO:
-}
-
 func (s *SimSuite) TestGetSliceSectionForwardFromZero(c *C) {
-	es := CreateTestEvents(1000, "x", "x", "x")
+	es := CreateTestEvents(15, "x", "x", "x")
 
-	sl, isF, isL, isH := getSliceSection(es, 0, 100, "forward")
+	sl, isF, isL, isH := getSliceSection(es, 0, 10, "forward")
 
-	c.Assert(sl, HasLen, 100)
+	c.Assert(sl, HasLen, 10)
 	c.Assert(isF, Equals, false)
 	c.Assert(isL, Equals, true)
 	c.Assert(isH, Equals, false)
 	c.Assert(sl[0].EventNumber, Equals, 0)
-	c.Assert(sl[len(sl)-1].EventNumber, Equals, 99)
+	c.Assert(sl[len(sl)-1].EventNumber, Equals, 9)
 }
 
 //Testing a slice from the middle of the strem not exceeding any bounds.
-func (su *SimSuite) TestGetSliceSectionForward(c *C) {
+func (s *SimSuite) TestGetSliceSectionForward(c *C) {
 	es := CreateTestEvents(100, "x", "x", "x")
 
-	s, isF, isL, isH := getSliceSection(es, 25, 50, "forward")
+	se, isF, isL, isH := getSliceSection(es, 25, 50, "forward")
 
-	c.Assert(s, HasLen, 50)
+	c.Assert(se, HasLen, 50)
 	c.Assert(isF, Equals, false)
 	c.Assert(isL, Equals, false)
 	c.Assert(isH, Equals, false)
 
-	c.Assert(s[0].EventNumber, Equals, 25)
-	c.Assert(s[len(s)-1].EventNumber, Equals, 74)
+	c.Assert(se[0].EventNumber, Equals, 25)
+	c.Assert(se[len(se)-1].EventNumber, Equals, 74)
 }
 
 //Testing a slice from the middle of the stream not exceeding any bounds
-func (su *SimSuite) TestGetSliceSectionBackward(c *C) {
+func (s *SimSuite) TestGetSliceSectionBackward(c *C) {
 	es := CreateTestEvents(100, "x", "x", "x")
 
-	s, isF, isL, isH := getSliceSection(es, 75, 50, "backward")
+	se, isF, isL, isH := getSliceSection(es, 75, 50, "backward")
 
-	c.Assert(s, HasLen, 50)
+	c.Assert(se, HasLen, 50)
 	c.Assert(isF, Equals, false)
 	c.Assert(isL, Equals, false)
 	c.Assert(isH, Equals, false)
-	c.Assert(s[0].EventNumber, Equals, 26)
-	c.Assert(s[len(s)-1].EventNumber, Equals, 75)
+	c.Assert(se[0].EventNumber, Equals, 26)
+	c.Assert(se[len(se)-1].EventNumber, Equals, 75)
 }
 
 //Version number is in range, but page number means the set will exceed
 //the number of events in the stream.
-func (su *SimSuite) TestGetSliceSectionBackwardUnder(c *C) {
+func (s *SimSuite) TestGetSliceSectionBackwardUnder(c *C) {
 	es := CreateTestEvents(100, "x", "x", "x")
 
-	s, isF, isL, isH := getSliceSection(es, 25, 50, "backward")
+	se, isF, isL, isH := getSliceSection(es, 25, 50, "backward")
 
-	c.Assert(s, HasLen, 26)
+	c.Assert(se, HasLen, 26)
 	c.Assert(isF, Equals, false)
 	c.Assert(isL, Equals, true)
 	c.Assert(isH, Equals, false)
-	c.Assert(s[0].EventNumber, Equals, 0)
-	c.Assert(s[len(s)-1].EventNumber, Equals, 25)
+	c.Assert(se[0].EventNumber, Equals, 0)
+	c.Assert(se[len(se)-1].EventNumber, Equals, 25)
 }
 
 //Testing the case where the version may be over the
 //size of the highest version. This will happen when
 //polling the head of the stream waiting for changes
-func (su *SimSuite) TestGetSliceSectionForwardOut(c *C) {
+func (s *SimSuite) TestGetSliceSectionForwardOut(c *C) {
 	es := CreateTestEvents(100, "x", "x", "x")
 
-	s, isF, isL, isH := getSliceSection(es, 101, 50, "forward")
+	se, isF, isL, isH := getSliceSection(es, 101, 50, "forward")
 
-	c.Assert(s, HasLen, 0)
+	c.Assert(se, HasLen, 0)
 	c.Assert(isF, Equals, true)
 	c.Assert(isL, Equals, false)
 	c.Assert(isH, Equals, true)
-
 }
 
 // Version number is in range but version plus pagesize is greter the the highest
 // event number and so the query exeeds the number of results that can be returned
-func (su *SimSuite) TestGetSliceSectionForwardOver(c *C) {
+func (s *SimSuite) TestGetSliceSectionForwardOver(c *C) {
 	es := CreateTestEvents(100, "x", "x", "x")
 
-	s, isF, isL, isH := getSliceSection(es, 75, 50, "forward")
-	c.Assert(s, HasLen, 25)
+	se, isF, isL, isH := getSliceSection(es, 75, 50, "forward")
+	c.Assert(se, HasLen, 25)
 	c.Assert(isF, Equals, true)
 	c.Assert(isL, Equals, false)
 	c.Assert(isH, Equals, true)
-	c.Assert(s[0].EventNumber, Equals, 75)
-	c.Assert(s[len(s)-1].EventNumber, Equals, 99)
+	c.Assert(se[0].EventNumber, Equals, 75)
+	c.Assert(se[len(se)-1].EventNumber, Equals, 99)
 }
 
 // This test covers the case where the version is higher than the highest version
-func (su *SimSuite) TestGetSliceSectionTail(c *C) {
+func (s *SimSuite) TestGetSliceSectionTail(c *C) {
 	es := CreateTestEvents(100, "x", "x", "x")
 
-	s, isF, isL, isH := getSliceSection(es, 100, 20, "forward")
+	se, isF, isL, isH := getSliceSection(es, 100, 20, "forward")
 
-	c.Assert(s, HasLen, 0)
+	c.Assert(se, HasLen, 0)
 	c.Assert(isF, Equals, true)
 	c.Assert(isL, Equals, false)
 	c.Assert(isH, Equals, true)
 }
 
-func (su *SimSuite) TestGetSliceSectionAllForward(c *C) {
+func (s *SimSuite) TestGetSliceSectionAllForward(c *C) {
 	es := CreateTestEvents(100, "x", "x", "x")
 
-	s, isF, isL, isH := getSliceSection(es, 0, 100, "forward")
+	se, isF, isL, isH := getSliceSection(es, 0, 100, "forward")
 
-	c.Assert(s, HasLen, 100)
+	c.Assert(se, HasLen, 100)
 	c.Assert(isF, Equals, true)
 	c.Assert(isL, Equals, true)
 	c.Assert(isH, Equals, true)
-	c.Assert(s[0].EventNumber, Equals, 0)
-	c.Assert(s[len(s)-1].EventNumber, Equals, 99)
+	c.Assert(se[0].EventNumber, Equals, 0)
+	c.Assert(se[len(se)-1].EventNumber, Equals, 99)
 }
 
 func (s *SimSuite) TestParseURLVersioned(c *C) {
@@ -525,7 +533,7 @@ func (s *SimSuite) TestSetStreamID(c *C) {
 func (s *SimSuite) TestTrickleFeed(c *C) {
 
 	stream := "trickle-stream"
-	es := CreateTestEvents(10, stream, server.URL, "EventTypeX")
+	es := CreateTestEvents(6, stream, server.URL, "EventTypeX")
 
 	u, _ := url.Parse(server.URL)
 	handler, err := NewAtomFeedSimulator(es, u, nil, 5)
@@ -537,34 +545,21 @@ func (s *SimSuite) TestTrickleFeed(c *C) {
 	reader := client.NewStreamReader(stream)
 
 	count := 0
-	// start := time.Now()
 	for reader.Next() {
-
-		fmt.Printf("Call Next count %d lenes-1 %d trickle %d\n", count, len(es)-1, handler.trickleAfter)
-
 		if count > len(es)-1 {
 			return
-		}
-
-		if reader.EventResponse() != nil {
-			fmt.Printf("EventNumber %d\n", reader.EventResponse().Event.EventNumber)
 		}
 
 		if count < 5 {
 			c.Assert(reader.Err(), Equals, nil)
 			c.Assert(reader.EventResponse, NotNil)
 		} else if count == 5 {
-			fmt.Println("Count 5 NoEvents")
 			c.Assert(typeOf(reader.Err()), Equals, "NoMoreEventsError")
-			reader.LongPoll(5)
+			reader.LongPoll(1)
 		} else if count > 5 && count < 10 {
-			fmt.Printf("> 5  Error: %#v EventResp %#v\n", reader.Err(), reader.EventResponse())
 			c.Assert(reader.Err(), Equals, nil)
-			// reader.LongPoll(5)
-
+			c.Assert(reader.EventResponse, NotNil)
 		}
-
 		count++
-		// start = time.Now()
 	}
 }

@@ -6,210 +6,52 @@
 package goes
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
-	"io"
-	"io/ioutil"
-	"net/http"
-	"net/url"
 	"reflect"
 )
 
-type basicAuthCredentials struct {
-	Username string
-	Password string
+type invalidVersionError int
+
+func (i invalidVersionError) Error() string {
+	return fmt.Sprintf("%d is not a valid event number", i)
 }
 
-// client is the object used to interact with the eventstore.
+// NoMoreEventsError is returned when there are no events to return
+// from a request to a stream.
+type NoMoreEventsError struct{}
+
+func (e NoMoreEventsError) Error() string {
+	return "There are no more events to load."
+}
+
+// NotFoundError is returned when a stream is not found.
+type NotFoundError struct{}
+
+func (e NotFoundError) Error() string {
+	return "The stream does not exist."
+}
+
+// UnauthorizedError is returned when a request to the eventstore is
+// not authorized
+type UnauthorizedError struct{}
+
+func (e UnauthorizedError) Error() string {
+	return "You are not authorised to access the stream or the stream does not exist."
+}
+
+// TemporarilyUnavailableError is returned when the server returns ServiceUnavailable.
 //
-// Use the NewClient constructor to get a client.
-type Client struct {
-	client      *http.Client
-	BaseURL     *url.URL
-	credentials *basicAuthCredentials
-	headers     map[string]string
+// This error may be returned if a request is made to the server during startup. When
+// the server starts up initially and the client is completely unable to connect to the
+// server a *url.Error will be returned. Once the server is up but not ready to serve
+// requests a ServiceUnavailable error will be returned for a breif period.
+type TemporarilyUnavailableError struct{}
+
+func (e TemporarilyUnavailableError) Error() string {
+	return "Server Is Not Ready"
 }
 
-// NewClient constructs and returns a new client.
-//
-// httpClient will usually be nil and will use the http.DefaultClient.
-// serverURL is the url to your eventstore server.
-func NewClient(httpClient *http.Client, serverURL string) (*Client, error) {
-	if httpClient == nil {
-		httpClient = http.DefaultClient
-	}
-	baseURL, err := url.Parse(serverURL)
-	if err != nil {
-		return nil, err
-	}
-
-	c := &Client{
-		client:  httpClient,
-		BaseURL: baseURL,
-		headers: make(map[string]string),
-	}
-
-	c.headers["Content-Type"] = "application/vnd.eventstore.events+json"
-
-	return c, nil
-}
-
-func (c *Client) NewStreamReader(streamName string) StreamReader {
-	return &streamReader{
-		streamName: streamName,
-		client:     c,
-		version:    -1,
-		pageSize:   20,
-	}
-}
-
-func (c *Client) NewStreamWriter(streamName string) StreamWriter {
-	return &streamWriter{
-		client:     c,
-		streamName: streamName,
-	}
-}
-
-func (c *Client) do(req *http.Request, v io.Writer) (*Response, error) {
-	var keep, send io.ReadCloser
-
-	if req.Body != nil {
-		if buf, err := ioutil.ReadAll(req.Body); err == nil {
-			keep = ioutil.NopCloser(bytes.NewReader(buf))
-			send = ioutil.NopCloser(bytes.NewReader(buf))
-			req.Body = send
-		}
-	}
-	resp, err := c.client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	defer resp.Body.Close()
-
-	response := newResponse(resp)
-
-	if keep != nil {
-		req.Body = keep
-	}
-	err = checkResponse(resp, req)
-	if err != nil {
-
-		// even though there was an error, we still return the response
-		// in case the caller wants to inspect it further
-		return response, err
-	}
-
-	// When handling post requests v will be nil
-	if v != nil {
-		io.Copy(v, resp.Body)
-	}
-
-	return response, err
-}
-
-func (c *Client) SetBasicAuth(username, password string) {
-	c.credentials = &basicAuthCredentials{
-		Username: username,
-		Password: password,
-	}
-}
-
-// Response encapsulates data from the http response.
-//
-// A Response object is returned from all method interacting with the eventstore
-// server. It is intended to provide access to data about the response in case
-// the user wants to inspect the response such as the status or the raw http
-// response.
-//
-// A Response object contains the raw http response, the status code returned
-// and the status message returned.
-type Response struct {
-	*http.Response
-	StatusCode    int
-	StatusMessage string
-}
-
-// ErrorResponse encapsulates data about an interaction with the eventstore that
-// produced an http error.
-//
-// Response contains the raw http response.
-// Message contains the status message returned from the server.
-// StatusCode contains the status code returned from the server.
-type ErrorResponse struct {
-	Response   *http.Response // HTTP response that caused this error
-	Request    *http.Request
-	Message    string
-	StatusCode int
-}
-
-func (r *ErrorResponse) Error() string {
-	return fmt.Sprintf("%v %v: %d %+v",
-		r.Response.Request.Method, r.Response.Request.URL,
-		r.Response.StatusCode, r.Message)
-}
-
-func checkResponse(r *http.Response, req *http.Request) error {
-	if c := r.StatusCode; 200 <= c && c <= 299 {
-		return nil
-	}
-	errorResponse := &ErrorResponse{Response: r}
-	data, err := ioutil.ReadAll(r.Body)
-	if err == nil && data != nil {
-		json.Unmarshal(data, errorResponse)
-	}
-	errorResponse.Message = r.Status
-	errorResponse.StatusCode = r.StatusCode
-	errorResponse.Request = req
-
-	return errorResponse
-}
-
-// newResponse creates a new Response for the provided http.Response.
-func newResponse(r *http.Response) *Response {
-	response := &Response{Response: r}
-	response.StatusMessage = r.Status
-	response.StatusCode = r.StatusCode
-	return response
-}
-
-func (c *Client) newRequest(method, urlString string, body interface{}) (*http.Request, error) {
-
-	url, err := url.Parse(urlString)
-	if err != nil {
-		return nil, err
-	}
-
-	if !url.IsAbs() {
-		url = c.BaseURL.ResolveReference(url)
-	}
-
-	var buf io.ReadWriter
-	if body != nil {
-		buf = new(bytes.Buffer)
-		err := json.NewEncoder(buf).Encode(body)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	req, err := http.NewRequest(method, url.String(), buf)
-	if err != nil {
-		return nil, err
-	}
-
-	if c.credentials != nil {
-		req.SetBasicAuth(c.credentials.Username, c.credentials.Password)
-	}
-
-	for k, v := range c.headers {
-		req.Header.Set(k, v)
-	}
-
-	return req, nil
-}
-
+// typeOf is a helper to get the names of types.
 func typeOf(i interface{}) string {
 	if i == nil {
 		return ""

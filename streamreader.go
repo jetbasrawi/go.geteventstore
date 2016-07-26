@@ -10,12 +10,14 @@ import (
 	"github.com/jetbasrawi/goes/internal/atom"
 )
 
+// StreamReader is the interface that the streamReader should implement
 type StreamReader interface {
 	Version() int
 	NextVersion(version int)
 	Err() error
 	Next() bool
 	Scan(e interface{}, m interface{}) error
+	MetaData() (*EventResponse, error)
 	EventResponse() *EventResponse
 	LongPoll(seconds int)
 }
@@ -34,20 +36,24 @@ type streamReader struct {
 	loadFeedPage  bool
 }
 
-func (this *streamReader) Err() error {
-	return this.lasterr
+// Err returns any error that is raised as a result of a call to Next() or Scan()
+func (s *streamReader) Err() error {
+	return s.lasterr
 }
 
-func (this *streamReader) Version() int {
-	return this.version
+// Version returns the current stream version of the reader
+func (s *streamReader) Version() int {
+	return s.version
 }
 
-func (this *streamReader) NextVersion(version int) {
-	this.nextVersion = version
+// NextVersion is the version of the stream that will be returned by a call to Next()
+func (s *streamReader) NextVersion(version int) {
+	s.nextVersion = version
 }
 
-func (this *streamReader) EventResponse() *EventResponse {
-	return this.eventResponse
+// EventResponse returns the container for the event that is returned from a call to Next().
+func (s *streamReader) EventResponse() *EventResponse {
+	return s.eventResponse
 }
 
 //Next gets the next event on the stream from the current version number.
@@ -65,7 +71,7 @@ func (this *streamReader) EventResponse() *EventResponse {
 //inspected. It is left to the client to determine under what conditions to exit
 //the loop.
 //
-//This approach provides a strightforward mechanism to enumerate events. This
+//s approach provides a strightforward mechanism to enumerate events. s
 //approach also provides a convenient way to handle retries in response to
 //network or protocol errors.
 //
@@ -83,7 +89,7 @@ func (this *streamReader) EventResponse() *EventResponse {
 //  for stream.Next() {
 //		if stream.Err() != nil {
 //			//Connection and protocol errors etc are returned from the http
-//			//client. This may indicate that the eventstore server is not
+//			//client. s may indicate that the eventstore server is not
 //			//available or some other infrastructure issue.
 //			if e, ok := stream.Err().(*url.Error); ok {
 //				<- time.After()
@@ -97,12 +103,12 @@ func (this *streamReader) EventResponse() *EventResponse {
 //					//If you want to poll the end of the stream for new events
 //					//wait some duration and then retry as shown below.
 //					<- time.After()
-//					this.version--
+//					s.version--
 //					continue
 //				case ErrUnauthorised:
 //					// Indicates that you are not authorised to access the stream
 // however, when accessing system streams such as a category
-// projection this error is returned in cases where
+// projection s error is returned in cases where
 //				case ErrStreamDoesNotExist:
 //					//
 //				default:
@@ -117,59 +123,59 @@ func (this *streamReader) EventResponse() *EventResponse {
 //Errors
 //ErrStreamDoesNotExist: Returned when the requested stream does not exist.
 //ErrUnauthorized: Returned when the request is not authorised to read a stream.
-func (this *streamReader) Next() bool {
-	this.lasterr = nil
+func (s *streamReader) Next() bool {
+	s.lasterr = nil
 
 	numEntries := 0
-	if this.feedPage != nil {
-		numEntries = len(this.feedPage.Entry)
+	if s.feedPage != nil {
+		numEntries = len(s.feedPage.Entry)
 	}
 
 	//fmt.Printf("Version %d NextVersion %d index %d entries %d\n",
-	//this.version, this.nextVersion, this.index, numEntries)
-	//fmt.Printf("URL %s\n", this.currentURL)
-	//fmt.Printf("Load: %t\n", this.loadFeedPage)
+	//s.version, s.nextVersion, s.index, numEntries)
+	//fmt.Printf("URL %s\n", s.currentURL)
+	//fmt.Printf("Load: %t\n", s.loadFeedPage)
 
 	// The feed page will be nil when the stream reader is first created.
 	// The initial feed page url will be constructed based on the current
 	// version number.
-	if this.feedPage == nil {
-		this.index = -1
+	if s.feedPage == nil {
+		s.index = -1
 		url, err := getFeedURL(
-			this.streamName,
+			s.streamName,
 			"forward",
-			this.nextVersion,
+			s.nextVersion,
 			nil,
-			this.pageSize,
+			s.pageSize,
 		)
 		if err != nil {
-			this.lasterr = err
+			s.lasterr = err
 			return false
 		}
-		this.currentURL = url
+		s.currentURL = url
 	}
 
 	// If the index is less than 0 load the previous feed page.
 	// GetEventStore uses previous to point to more recent feed pages and uses
 	// next to point to older feed pages. A stream starts at the most recent
 	// event and ends at the oldest event.
-	if this.index < 0 {
-		if this.feedPage != nil {
+	if s.index < 0 {
+		if s.feedPage != nil {
 			// Get the url for the previous feed page. If the reader is at the head
 			// of the stream, the previous link in the feedpage will be nil.
-			if l := this.feedPage.GetLink("previous"); l != nil {
-				this.currentURL = l.Href
+			if l := s.feedPage.GetLink("previous"); l != nil {
+				s.currentURL = l.Href
 			}
 		}
 
 		//Read the feedpage at the current url
-		f, resp, err := this.client.readStream(this.currentURL)
+		f, resp, err := s.client.readStream(s.currentURL)
 		if err != nil {
 			// If the response is nil, the error has occured before a http
-			// request. Typically this will be some protocol issue such as
+			// request. Typically s will be some protocol issue such as
 			// the eventstore server not being available.
 			if resp == nil {
-				this.lasterr = err
+				s.lasterr = err
 				return true
 			}
 
@@ -181,72 +187,74 @@ func (this *streamReader) Next() bool {
 				//be returned. True is returned to let the client decide in
 				//their loop how to respond.
 				case http.StatusNotFound:
-					this.lasterr = &StreamDoesNotExistError{}
+					s.lasterr = &NotFoundError{}
 					return true
 				//If the request has insufficient permissions to access the
 				//stream ErrUnauthorized will be returned.
 				//True is returned to let the client decide in
 				//their loop how to respond.
 				case http.StatusUnauthorized:
-					this.lasterr = &UnauthorizedError{}
+					s.lasterr = &UnauthorizedError{}
 					return true
 				//503 is also returned if the server is temporarily unable
 				//to handle the request
 				case http.StatusServiceUnavailable:
-					this.lasterr = &TemporarilyUnavailableError{}
+					s.lasterr = &TemporarilyUnavailableError{}
 					return true
 				default:
-					this.lasterr = err
+					s.lasterr = err
 					return true
 				}
 			}
 		}
 
-		this.feedPage = f
+		s.feedPage = f
 
 		numEntries = len(f.Entry)
-		this.index = numEntries - 1
+		s.index = numEntries - 1
 
 	}
 
 	//If there are no events returned at the url return an error
 	if numEntries <= 0 {
-		this.eventResponse = nil
-		this.lasterr = &NoMoreEventsError{}
+		s.eventResponse = nil
+		s.lasterr = &NoMoreEventsError{}
 		return true
 	}
 
-	// prev := this.feedPage.GetLink("previous")
+	// prev := s.feedPage.GetLink("previous")
 	// fmt.Println(prev)
 
 	//There are events returned, get the event for the current version
-	entry := this.feedPage.Entry[this.index]
+	entry := s.feedPage.Entry[s.index]
 	url := strings.TrimRight(entry.Link[1].Href, "/")
-	e, _, err := this.client.GetEvent(url)
+	e, _, err := s.client.GetEvent(url)
 	if err != nil {
-		this.lasterr = err
+		s.lasterr = err
 		return true
 	}
-	this.eventResponse = e
-	this.version = this.nextVersion
-	this.nextVersion++
-	this.index--
+	s.eventResponse = e
+	s.version = s.nextVersion
+	s.nextVersion++
+	s.index--
 
 	return true
 }
 
-func (this *streamReader) Scan(e interface{}, m interface{}) error {
+// Scan deserializes event and event metadata into the types passed in
+// as arguments e and m.
+func (s *streamReader) Scan(e interface{}, m interface{}) error {
 
-	if this.lasterr != nil {
-		return this.lasterr
+	if s.lasterr != nil {
+		return s.lasterr
 	}
 
-	if this.eventResponse == nil {
+	if s.eventResponse == nil {
 		return &NoMoreEventsError{}
 	}
 
 	if e != nil {
-		data, ok := this.eventResponse.Event.Data.(*json.RawMessage)
+		data, ok := s.eventResponse.Event.Data.(*json.RawMessage)
 		if !ok {
 			return fmt.Errorf("Could not unmarshal the event. Event data is not of type *json.RawMessage")
 		}
@@ -257,7 +265,7 @@ func (this *streamReader) Scan(e interface{}, m interface{}) error {
 	}
 
 	if m != nil {
-		meta, ok := this.eventResponse.Event.MetaData.(*json.RawMessage)
+		meta, ok := s.eventResponse.Event.MetaData.(*json.RawMessage)
 		if !ok {
 			return fmt.Errorf("Could not unmarshal the event. Event data is not of type *json.RawMessage")
 		}
@@ -288,32 +296,56 @@ func (this *streamReader) Scan(e interface{}, m interface{}) error {
 // request to be made with ES-LongPoll set to that value. Any value 0 or below
 // will cause the request to be made without ES-LongPoll and the server will not
 // wait to return.
-func (this *streamReader) LongPoll(seconds int) {
+func (s *streamReader) LongPoll(seconds int) {
 	if seconds > 0 {
-		this.client.headers["ES-LongPoll"] = strconv.Itoa(seconds)
+		s.client.headers["ES-LongPoll"] = strconv.Itoa(seconds)
 	} else {
-		delete(this.client.headers, "ES-LongPoll")
+		delete(s.client.headers, "ES-LongPoll")
 	}
 }
 
-//// MetaData gets the metadata for a stream.
-////
-//// Stream metadata is retured as an EventResponse.
-//// If the stream metadata is empty the EventResponse will be nil and the Response will
-//// contain a 200 status code.
-////
-//// For more information on stream metadata see:
-//// http://docs.geteventstore.com/http-api/3.6.0/stream-metadata/
-//func (s *streamReader) MetaData() (*EventResponse, *Response, error) {
+// MetaData gets the metadata for a stream.
+//
+// Stream metadata is retured as an EventResponse.
+//
+// For more information on stream metadata see:
+// http://docs.geteventstore.com/http-api/3.7.0/stream-metadata/
+func (s *streamReader) MetaData() (*EventResponse, error) {
 
-//url, resp, err := s.client.getMetadataURL(s.stream)
-//if err != nil {
-//return nil, resp, err
-//}
-//er, resp, err := s.client.GetEvent(url)
-//if err != nil {
-//return nil, resp, err
-//}
+	url, resp, err := s.client.getMetadataURL(s.streamName)
+	if err != nil {
+		if resp == nil {
+			return nil, err
+		}
 
-//return er, resp, nil
-//}
+		switch resp.StatusCode {
+		case http.StatusUnauthorized:
+			return nil, &UnauthorizedError{}
+		case http.StatusNotFound:
+			return nil, &NotFoundError{}
+		case http.StatusServiceUnavailable:
+			return nil, &TemporarilyUnavailableError{}
+		default:
+			return nil, err
+		}
+	}
+	ev, resp, err := s.client.GetEvent(url)
+	if err != nil {
+		if resp == nil {
+			return nil, err
+		}
+
+		switch resp.StatusCode {
+		case http.StatusUnauthorized:
+			return nil, &UnauthorizedError{}
+		case http.StatusNotFound:
+			return nil, &NotFoundError{}
+		case http.StatusServiceUnavailable:
+			return nil, &TemporarilyUnavailableError{}
+		default:
+			return nil, err
+		}
+
+	}
+	return ev, nil
+}

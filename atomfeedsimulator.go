@@ -4,6 +4,7 @@ package goes
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"math/rand"
@@ -42,7 +43,23 @@ type AtomFeedSimulator struct {
 }
 
 // NewAtomFeedSimulator consructs a new AtomFeedSimulator
+//
+// events is a slice of *Event that will be returned by the handler. The events are equivalent to the
+// total number of events in a stream and these can be read and paged as you would read and page a stream
+// in GetEventStore. The number of events must be greater than 0.
+// baseURL is the base url of the test server.
+// streamMeta is the stream metadata that should be returned if a request for metadata is made to the server.
+// trickleAfter is used to simulate polling and the arrival of new events while polling. The simulator will
+// return any events after the version specified by the trickleAfter argument. For example, if ten events are
+// passed in and trickleAfter is set to 5, the first five events will be returned in a feed page and then a
+// subsequent poll to the head of the stream will return no events. Set the LongPoll header and the simulator
+// will return the next five events at some random interval between 0 and the value of the LongPoll header.
 func NewAtomFeedSimulator(events []*Event, baseURL *url.URL, streamMeta *Event, trickleAfter int) (*AtomFeedSimulator, error) {
+
+	if len(events) <= 0 {
+		return nil, errors.New("Must provide one or more events.")
+	}
+
 	fs := &AtomFeedSimulator{
 		Events:       events,
 		BaseURL:      baseURL,
@@ -78,12 +95,9 @@ func (h *AtomFeedSimulator) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		reqURL = h.BaseURL.ResolveReference(reqURL)
 	}
 
-	longPoll := r.Header.Get("ES-LongPoll")
-
 	// Feed Request
 	if h.feedRegex.MatchString(reqURL.String()) {
 
-		fmt.Printf("Trickle1 %d\n", h.trickleAfter)
 		index := h.trickleAfter
 		if index < 0 {
 			index = 0
@@ -100,17 +114,21 @@ func (h *AtomFeedSimulator) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if len(f.Entry) <= 0 && r.Header.Get("ES-LongPoll") != "" {
-
-			fmt.Printf("Trickle2 %d\n", h.trickleAfter)
+			longPoll, err := strconv.Atoi(r.Header.Get("ES-LongPoll"))
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 
 			h.Lock()
 			h.trickleAfter++
-			// r, err := parseURL(reqURL.String())
+			if h.trickleAfter > len(h.Events) {
+				h.trickleAfter--
+			}
 			index := h.trickleAfter
 			if index < 0 {
 				index = 0
 			}
-			fmt.Printf("ES-LongPoll %s, index %d lenEvents-1 %d\n", longPoll, index, len(h.Events)-1)
 
 			f, err = CreateTestFeed(h.Events[:index], reqURL.String())
 			h.Unlock()
@@ -122,7 +140,12 @@ func (h *AtomFeedSimulator) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				}
 				return
 			}
-			time.Sleep(time.Duration(2) * time.Second)
+
+			waitDuration := longPoll
+			if len(f.Entry) > 0 {
+				waitDuration = rand.Intn(longPoll)
+			}
+			time.Sleep(time.Duration(waitDuration) * time.Second)
 		}
 		fmt.Fprint(w, f.PrettyPrint())
 	}
@@ -165,7 +188,6 @@ func (h *AtomFeedSimulator) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // If the url defines a set larger than the events passed in the returned events
 // will only contain the events available.
 func CreateTestFeed(es []*Event, feedURL string) (*atom.Feed, error) {
-
 	if len(es) <= 0 {
 		spew.Dump(es)
 		fmt.Println(feedURL)
@@ -232,8 +254,6 @@ func CreateTestFeed(es []*Event, feedURL string) (*atom.Feed, error) {
 		e.Link = append(e.Link, atom.Link{Rel: "alternate", Href: v.Links[0].URI})
 		f.Entry = append(f.Entry, e)
 	}
-
-	fmt.Printf("CreateTestFeed numEvents %d %s returned %d\n", len(es), feedURL, len(f.Entry))
 
 	return f, nil
 }
@@ -312,8 +332,10 @@ func CreateTestEvent(stream, server, eventType string, eventNumber int, data *js
 	return &e
 }
 
-// CreateTestEvents will return a slice of random test events. The types of the events will
-// be randomly selected from the event type names passed in to the variadic argument eventTypes
+// CreateTestEvents will return a slice of random test events.
+//
+// The types of the events will be randomly selected from the event type names passed in to the
+// variadic argument eventTypes
 func CreateTestEvents(numEvents int, stream string, server string, eventTypes ...string) []*Event {
 	se := []*Event{}
 	for i := 0; i < numEvents; i++ {
