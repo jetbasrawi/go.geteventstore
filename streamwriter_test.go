@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"strconv"
 
 	. "gopkg.in/check.v1"
 )
@@ -50,11 +49,9 @@ func (s *StreamWriterSuite) TestAppendEventsSingle(c *C) {
 	})
 
 	streamWriter := client.NewStreamWriter(streamName)
-	resp, err := streamWriter.Append(nil, ev)
+	err := streamWriter.Append(nil, ev)
 
 	c.Assert(err, IsNil)
-	c.Assert(resp.StatusMessage, Equals, "201 Created")
-	c.Assert(resp.StatusCode, Equals, http.StatusCreated)
 }
 
 func (s *StreamWriterSuite) TestAppendEventsMultiple(c *C) {
@@ -86,76 +83,251 @@ func (s *StreamWriterSuite) TestAppendEventsMultiple(c *C) {
 	})
 
 	streamWriter := client.NewStreamWriter(stream)
-	resp, err := streamWriter.Append(nil, ev1, ev2)
+	err := streamWriter.Append(nil, ev1, ev2)
 
 	c.Assert(err, IsNil)
-	c.Assert(resp.StatusMessage, Equals, "201 Created")
-	c.Assert(resp.StatusCode, Equals, http.StatusCreated)
 }
 
-func (s *EventSuite) TestAppendEventsWithExpectedVersion(c *C) {
-	data := &MyDataType{Field1: 445, Field2: "Some string"}
-	et := "SomeEventType"
-	ev := ToEventData("", et, data, nil)
+// func (s *StreamWriterSuite) TestAppendEventsWithConcurrencyError(c *C) {
+// 	data := &MyDataType{Field1: 445, Field2: "Some string"}
+// 	et := "SomeEventType"
+// 	ev := ToEventData("", et, data, nil)
 
-	stream := "Some-Stream"
-	url := fmt.Sprintf("/streams/%s", stream)
+// 	stream := "Some-Stream"
+// 	url := fmt.Sprintf("/streams/%s", stream)
 
-	expectedVersion := 5
+// 	expectedVersion := 5
+
+// 	mux.HandleFunc(url, func(w http.ResponseWriter, r *http.Request) {
+// 		c.Assert(r.Method, Equals, http.MethodPost)
+
+// 		want := strconv.Itoa(expectedVersion)
+// 		got := r.Header.Get("ES-ExpectedVersion")
+// 		c.Assert(got, Equals, want)
+
+// 		w.WriteHeader(http.StatusBadRequest)
+
+// 		fmt.Fprint(w, "")
+// 	})
+
+// 	streamWriter := client.NewStreamWriter(stream)
+// 	err := streamWriter.Append(&expectedVersion, ev)
+// 	c.Assert(err, NotNil)
+// 	c.Assert(typeOf(err), DeepEquals, "ConcurrencyError")
+// }
+
+func (s *StreamWriterSuite) TestAppendStreamMetadata(c *C) {
+	eventType := "MetaData"
+	stream := "SomeStream"
+
+	// Before updating the metadata, the method needs to get the MetaData url
+	// According to the docs, the eventstore team reserve the right to change
+	// the metadata url.
+	path := fmt.Sprintf("/streams/%s/0/forward/1", stream)
+	fullURL := fmt.Sprintf("%s%s", server.URL, path)
+	mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
+		es := CreateTestEvents(1, stream, server.URL, eventType)
+		f, _ := CreateTestFeed(es, fullURL)
+		fmt.Fprint(w, f.PrettyPrint())
+	})
+
+	meta := fmt.Sprintf("{\"baz\":\"boo\"}")
+	want := json.RawMessage(meta)
+
+	url := fmt.Sprintf("/streams/%s/metadata", stream)
 
 	mux.HandleFunc(url, func(w http.ResponseWriter, r *http.Request) {
-		c.Assert(r.Method, Equals, "POST")
+		c.Assert(r.Method, Equals, http.MethodPost)
 
-		want := strconv.Itoa(expectedVersion)
-		got := r.Header.Get("ES-ExpectedVersion")
-		c.Assert(got, Equals, want)
+		var got json.RawMessage
+		ev := &Event{Data: &got}
+		err := json.NewDecoder(r.Body).Decode(ev)
+		c.Assert(err, IsNil)
+		c.Assert(got, DeepEquals, want)
 
-		w.WriteHeader(http.StatusBadRequest)
+		w.WriteHeader(http.StatusCreated)
 		fmt.Fprint(w, "")
 	})
 
-	streamWriter := client.NewStreamWriter(stream)
-	resp, err := streamWriter.Append(&expectedVersion, ev)
-	c.Assert(err, NotNil)
-	c.Assert(resp.StatusMessage, Equals, "400 Bad Request")
-	c.Assert(resp.StatusCode, Equals, http.StatusBadRequest)
+	writer := client.NewStreamWriter(stream)
+	err := writer.WriteMetaData(stream, &want)
+	c.Assert(err, IsNil)
 }
 
-//func (s *StreamSuite) TestAppendStreamMetadata(c *C) {
-//eventType := "MetaData"
-//stream := "Some-Stream"
+func (s *StreamWriterSuite) TestAppendStreamMetadataReturnsUnauthorisedWhenGettingMetaURL(c *C) {
+	stream := "SomeStream"
+	path := fmt.Sprintf("/streams/%s/0/forward/1", stream)
+	mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		fmt.Fprint(w, "")
+	})
 
-//// Before updating the metadata, the method needs to get the MetaData url
-//// According to the docs, the eventstore team reserve the right to change
-//// the metadata url.
-//fURL := fmt.Sprintf("/streams/%s/head/backward/100", stream)
-//fullURL := fmt.Sprintf("%s%s", server.URL, fURL)
-//mux.HandleFunc(fURL, func(w http.ResponseWriter, r *http.Request) {
-//es := CreateTestEvents(1, stream, server.URL, eventType)
-//f, _ := CreateTestFeed(es, fullURL)
-//fmt.Fprint(w, f.PrettyPrint())
-//})
+	meta := fmt.Sprintf("{\"baz\":\"boo\"}")
+	want := json.RawMessage(meta)
 
-//meta := fmt.Sprintf("{\"baz\":\"boo\"}")
-//want := json.RawMessage(meta)
+	writer := client.NewStreamWriter(stream)
+	err := writer.WriteMetaData(stream, &want)
 
-//url := fmt.Sprintf("/streams/%s/metadata", stream)
+	c.Assert(err, NotNil)
+	if e, ok := err.(*UnauthorizedError); ok {
+		c.Assert(e.ErrorResponse, NotNil)
+	} else {
+		c.Error("Error returned is not of type *UnauthorizedError")
+	}
+}
 
-//mux.HandleFunc(url, func(w http.ResponseWriter, r *http.Request) {
-//c.Assert(r.Method, Equals, "POST")
+func (s *StreamWriterSuite) TestAppendStreamMetadataReturnsTemporarilyUnavailableWhenGettingMetaURL(c *C) {
+	stream := "SomeStream"
+	path := fmt.Sprintf("/streams/%s/0/forward/1", stream)
+	mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		fmt.Fprint(w, "")
+	})
 
-//var got json.RawMessage
-//ev := &Event{Data: &got}
-//err := json.NewDecoder(r.Body).Decode(ev)
-//c.Assert(err, IsNil)
-//c.Assert(got, DeepEquals, want)
+	meta := fmt.Sprintf("{\"baz\":\"boo\"}")
+	want := json.RawMessage(meta)
 
-//w.WriteHeader(http.StatusCreated)
-//fmt.Fprint(w, "")
-//})
+	writer := client.NewStreamWriter(stream)
+	err := writer.WriteMetaData(stream, &want)
 
-//resp, err := client.UpdateStreamMetaData(stream, &want)
-//c.Assert(err, IsNil)
-//c.Assert(resp.StatusMessage, Equals, "201 Created")
-//c.Assert(resp.StatusCode, Equals, http.StatusCreated)
-//}
+	c.Assert(err, NotNil)
+	if e, ok := err.(*TemporarilyUnavailableError); ok {
+		c.Assert(e.ErrorResponse, NotNil)
+	} else {
+		c.Error("Error returned is not of type *TemporarilyUnavailableError")
+	}
+}
+
+func (s *StreamWriterSuite) TestAppendStreamMetadataReturnsUnexpectedErrorWhenGettingMetaURL(c *C) {
+	stream := "SomeStream"
+	path := fmt.Sprintf("/streams/%s/0/forward/1", stream)
+	mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
+		fmt.Println(r.URL.String())
+		w.WriteHeader(http.StatusHTTPVersionNotSupported)
+		fmt.Fprint(w, "")
+	})
+
+	meta := fmt.Sprintf("{\"baz\":\"boo\"}")
+	want := json.RawMessage(meta)
+
+	writer := client.NewStreamWriter(stream)
+	err := writer.WriteMetaData(stream, &want)
+
+	c.Assert(err, NotNil)
+	if e, ok := err.(*UnexpectedError); ok {
+		c.Assert(e.ErrorResponse, NotNil)
+	} else {
+		c.Error("Error returned is not of type *UnexpectedError")
+	}
+}
+
+func (s *StreamWriterSuite) TestAppendStreamMetadataReturnsUnexpectedErrorWhenWritingMeta(c *C) {
+	eventType := "MetaData"
+	stream := "SomeStream"
+
+	// Before updating the metadata, the method needs to get the MetaData url
+	// According to the docs, the eventstore team reserve the right to change
+	// the metadata url.
+	path := fmt.Sprintf("/streams/%s/0/forward/1", stream)
+	fullURL := fmt.Sprintf("%s%s", server.URL, path)
+	mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
+		es := CreateTestEvents(1, stream, server.URL, eventType)
+		f, _ := CreateTestFeed(es, fullURL)
+		fmt.Fprint(w, f.PrettyPrint())
+	})
+
+	meta := fmt.Sprintf("{\"baz\":\"boo\"}")
+	want := json.RawMessage(meta)
+
+	url := fmt.Sprintf("/streams/%s/metadata", stream)
+
+	mux.HandleFunc(url, func(w http.ResponseWriter, r *http.Request) {
+		c.Assert(r.Method, Equals, http.MethodPost)
+		w.WriteHeader(http.StatusLengthRequired)
+		fmt.Fprint(w, "")
+	})
+
+	writer := client.NewStreamWriter(stream)
+	err := writer.WriteMetaData(stream, &want)
+
+	c.Assert(err, NotNil)
+	if e, ok := err.(*UnexpectedError); ok {
+		c.Assert(e.ErrorResponse, NotNil)
+	} else {
+		c.Error("Error returned is not of type *UnexpectedError")
+	}
+}
+
+func (s *StreamWriterSuite) TestAppendStreamMetadataReturnsUnauthorizedErrorWhenWritingMeta(c *C) {
+	eventType := "MetaData"
+	stream := "SomeStream"
+
+	// Before updating the metadata, the method needs to get the MetaData url
+	// According to the docs, the eventstore team reserve the right to change
+	// the metadata url.
+	path := fmt.Sprintf("/streams/%s/0/forward/1", stream)
+	fullURL := fmt.Sprintf("%s%s", server.URL, path)
+	mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
+		es := CreateTestEvents(1, stream, server.URL, eventType)
+		f, _ := CreateTestFeed(es, fullURL)
+		fmt.Fprint(w, f.PrettyPrint())
+	})
+
+	meta := fmt.Sprintf("{\"baz\":\"boo\"}")
+	want := json.RawMessage(meta)
+
+	url := fmt.Sprintf("/streams/%s/metadata", stream)
+
+	mux.HandleFunc(url, func(w http.ResponseWriter, r *http.Request) {
+		c.Assert(r.Method, Equals, http.MethodPost)
+		w.WriteHeader(http.StatusUnauthorized)
+		fmt.Fprint(w, "")
+	})
+
+	writer := client.NewStreamWriter(stream)
+	err := writer.WriteMetaData(stream, &want)
+
+	c.Assert(err, NotNil)
+	if e, ok := err.(*UnauthorizedError); ok {
+		c.Assert(e.ErrorResponse, NotNil)
+	} else {
+		c.Error("Error returned is not of type *UnauthorizedError")
+	}
+}
+
+func (s *StreamWriterSuite) TestAppendStreamMetadataReturnsTemporarilyUnavailableErrorWhenWritingMeta(c *C) {
+	eventType := "MetaData"
+	stream := "SomeStream"
+
+	// Before updating the metadata, the method needs to get the MetaData url
+	// According to the docs, the eventstore team reserve the right to change
+	// the metadata url.
+	path := fmt.Sprintf("/streams/%s/0/forward/1", stream)
+	fullURL := fmt.Sprintf("%s%s", server.URL, path)
+	mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
+		es := CreateTestEvents(1, stream, server.URL, eventType)
+		f, _ := CreateTestFeed(es, fullURL)
+		fmt.Fprint(w, f.PrettyPrint())
+	})
+
+	meta := fmt.Sprintf("{\"baz\":\"boo\"}")
+	want := json.RawMessage(meta)
+
+	url := fmt.Sprintf("/streams/%s/metadata", stream)
+
+	mux.HandleFunc(url, func(w http.ResponseWriter, r *http.Request) {
+		c.Assert(r.Method, Equals, http.MethodPost)
+		w.WriteHeader(http.StatusServiceUnavailable)
+		fmt.Fprint(w, "")
+	})
+
+	writer := client.NewStreamWriter(stream)
+	err := writer.WriteMetaData(stream, &want)
+
+	c.Assert(err, NotNil)
+	if e, ok := err.(*TemporarilyUnavailableError); ok {
+		c.Assert(e.ErrorResponse, NotNil)
+	} else {
+		c.Error("Error returned is not of type *TemporarilyUnavailableError")
+	}
+}

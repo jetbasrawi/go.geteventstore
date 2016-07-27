@@ -201,10 +201,10 @@ type Response struct {
 // Message contains the status message returned from the server.
 // StatusCode contains the status code returned from the server.
 type ErrorResponse struct {
-	Response   *http.Response // HTTP response that caused this error
-	Request    *http.Request
-	Message    string
-	StatusCode int
+	*http.Response // HTTP response that caused this error
+	Request        *http.Request
+	Message        string
+	StatusCode     int
 }
 
 func (r *ErrorResponse) Error() string {
@@ -287,12 +287,12 @@ func (c *Client) readStream(url string) (*atom.Feed, *Response, error) {
 	return feed, resp, nil
 }
 
-// getMetadataURL gets the url for the stream metadata.
+// GetMetadataURL gets the url for the stream metadata.
 // according to the documentation the metadata url should be acquired through
 // a query to the stream feed as the authors of GetEventStore reserve the right
 // to change the url.
-// http://docs.geteventstore.com/http-api/3.7.0/stream-metadata/
-func (c *Client) getMetadataURL(stream string) (string, *Response, error) {
+// http://docs.geteventstore.com/http-api/3.6.0/stream-metadata/
+func (c *Client) GetMetadataURL(stream string) (string, *Response, error) {
 
 	url, err := getFeedURL(stream, "forward", 0, nil, 1)
 	if err != nil {
@@ -339,6 +339,8 @@ func getEventURLs(f *atom.Feed) ([]string, error) {
 // If version, take an direction are all nil or empty, the url returned will be
 // to read from the head of the stream backward with a page size of 100
 func getFeedURL(stream, direction string, version int, take *Take, pageSize int) (string, error) {
+
+	//TODO: Validate stream argumemt to ensure that it contains only url safe characters
 
 	ps := pageSize
 	if take != nil && take.Number < ps {

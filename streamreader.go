@@ -312,7 +312,7 @@ func (s *streamReader) LongPoll(seconds int) {
 // http://docs.geteventstore.com/http-api/3.7.0/stream-metadata/
 func (s *streamReader) MetaData() (*EventResponse, error) {
 
-	url, resp, err := s.client.getMetadataURL(s.streamName)
+	url, resp, err := s.client.GetMetadataURL(s.streamName)
 	if err != nil {
 		if resp == nil {
 			return nil, err

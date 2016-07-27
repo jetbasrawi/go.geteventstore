@@ -2,12 +2,14 @@ package goes
 
 import (
 	"fmt"
+	"net/http"
 	"strconv"
 )
 
 //StreamWriter
 type StreamWriter interface {
-	Append(*int, ...*Event) (*Response, error)
+	Append(*int, ...*Event) error
+	WriteMetaData(string, interface{}) error
 }
 
 type streamWriter struct {
@@ -24,13 +26,13 @@ type streamWriter struct {
 // -2 : The write should never conflict with anything and should always succeed
 // -1 : The stream should not exist at the time of writing. This write will create it.
 //  0 : The stream should exist but it should be empty
-func (s *streamWriter) Append(expectedVersion *int, events ...*Event) (*Response, error) {
+func (s *streamWriter) Append(expectedVersion *int, events ...*Event) error {
 
 	u := fmt.Sprintf("/streams/%s", s.streamName)
 
-	req, err := s.client.newRequest("POST", u, events)
+	req, err := s.client.newRequest(http.MethodPost, u, events)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	//TODO: review this
@@ -40,12 +42,69 @@ func (s *streamWriter) Append(expectedVersion *int, events ...*Event) (*Response
 		req.Header.Set("ES-ExpectedVersion", strconv.Itoa(*expectedVersion))
 	}
 
-	resp, err := s.client.do(req, nil)
+	_, err = s.client.do(req, nil)
 	if err != nil {
-		return resp, err
+		return err
 	}
 
-	return resp, nil
+	return nil
+}
+
+// WriteMetaData writes the metadata for a stream
+//
+// The operation will replace the current stream metadata
+//
+// For more information on stream metadata see:
+// http://docs.geteventstore.com/http-api/3.6.0/stream-metadata/
+//
+// If the metadata was written successfully the error returned will be nil.
+//
+// If an error occurs the error returned may be an UnauthorizedError, a
+// TemporarilyUnavailableError or an UnexpectedError if the error occured during a
+// http request to the server. In these cases, the *ErrorResponse will be available
+// for inspection as an ErrorResponse field on the error.
+// If an error occurred outside of the http request another type of error will be returned
+// such as a *url.Error in cases where the streamwriter is unable to connect to the server.
+func (s *streamWriter) WriteMetaData(stream string, metadata interface{}) error {
+
+	m := ToEventData("", "MetaData", metadata, nil)
+	mURL, _, err := s.client.GetMetadataURL(stream)
+	if err != nil {
+		if e, ok := err.(*ErrorResponse); ok {
+			switch e.StatusCode {
+			case http.StatusUnauthorized:
+				return &UnauthorizedError{ErrorResponse: e}
+			case http.StatusServiceUnavailable:
+				return &TemporarilyUnavailableError{ErrorResponse: e}
+			default:
+				return &UnexpectedError{ErrorResponse: e}
+			}
+		}
+		return err
+	}
+	req, err := s.client.newRequest(http.MethodPost, mURL, m)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Content-Type", "application/vnd.eventstore.events+json")
+
+	_, err = s.client.do(req, nil)
+	if err != nil {
+		if e, ok := err.(*ErrorResponse); ok {
+			switch e.StatusCode {
+			case http.StatusUnauthorized:
+				return &UnauthorizedError{ErrorResponse: e}
+			case http.StatusServiceUnavailable:
+				return &TemporarilyUnavailableError{ErrorResponse: e}
+			default:
+				return &UnexpectedError{ErrorResponse: e}
+			}
+		}
+		return err
+	}
+
+	return nil
 }
 
 //// UpdateMetaData updates the metadata for a stream

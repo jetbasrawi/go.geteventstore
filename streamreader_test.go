@@ -87,7 +87,7 @@ func (s *StreamReaderSuite) TestNextErrorsIfNotAuthorisedToAccessStream(c *C) {
 	stream := client.NewStreamReader("Something")
 	ok := stream.Next()
 	c.Assert(ok, Equals, true)
-	c.Assert(stream.Err(), Equals, &UnauthorizedError{})
+	c.Assert(stream.Err(), DeepEquals, &UnauthorizedError{})
 }
 
 // Testing the case where next has reached the end of the stream and there are
