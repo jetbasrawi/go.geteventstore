@@ -172,8 +172,8 @@ func (s *ClientSuite) TestErrorResponseContainsCopyOfTheOriginalRequest(c *C) {
 
 	_, err := client.do(req, nil)
 
-	if e, ok := err.(*ErrorResponse); ok {
-		c.Assert(e.Request, DeepEquals, req)
+	if e, ok := err.(*BadRequestError); ok {
+		c.Assert(e.ErrorResponse.Request, DeepEquals, req)
 	} else {
 		c.FailNow()
 	}
@@ -189,9 +189,9 @@ func (s *ClientSuite) TestErrorResponseContainsStatusCodeAndMessage(c *C) {
 
 	_, err := client.do(req, nil)
 
-	if e, ok := err.(*ErrorResponse); ok {
-		c.Assert(e.StatusCode, Equals, http.StatusBadRequest)
-		c.Assert(e.Message, Equals, "400 Bad Request")
+	if e, ok := err.(*BadRequestError); ok {
+		c.Assert(e.ErrorResponse.StatusCode, Equals, http.StatusBadRequest)
+		c.Assert(e.ErrorResponse.Message, Equals, "400 Bad Request")
 	} else {
 		c.FailNow()
 	}

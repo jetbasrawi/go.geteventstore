@@ -3,7 +3,6 @@ package goes
 import (
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"strconv"
 	"strings"
 
@@ -120,9 +119,22 @@ func (s *streamReader) EventResponse() *EventResponse {
 //		err := stream.Scan(&myevent)
 //	}
 //
-//Errors
-//ErrStreamDoesNotExist: Returned when the requested stream does not exist.
-//ErrUnauthorized: Returned when the request is not authorised to read a stream.
+// Errors that may be returned.
+//
+// NotFoundError
+//If the stream does not exist an NotFoundError will
+//be returned. True is returned to let the client decide in
+//their loop how to respond.
+//
+//UnauthorizedError
+//If the request has insufficient permissions to access the
+//stream an UnauthorizedError will be returned.
+
+// TemporarilyUnavailableError
+// 503 ServiceUnavailable is returned if the server is temporarily unable
+// to handle the request. This can occur during startup of the eventstore
+// for a breif period after the server has come online but is not yet ready
+// to handle requests
 func (s *streamReader) Next() bool {
 	s.lasterr = nil
 
@@ -131,23 +143,12 @@ func (s *streamReader) Next() bool {
 		numEntries = len(s.feedPage.Entry)
 	}
 
-	//fmt.Printf("Version %d NextVersion %d index %d entries %d\n",
-	//s.version, s.nextVersion, s.index, numEntries)
-	//fmt.Printf("URL %s\n", s.currentURL)
-	//fmt.Printf("Load: %t\n", s.loadFeedPage)
-
 	// The feed page will be nil when the stream reader is first created.
 	// The initial feed page url will be constructed based on the current
 	// version number.
 	if s.feedPage == nil {
 		s.index = -1
-		url, err := getFeedURL(
-			s.streamName,
-			"forward",
-			s.nextVersion,
-			nil,
-			s.pageSize,
-		)
+		url, err := getFeedURL(s.streamName, "forward", s.nextVersion, nil, s.pageSize)
 		if err != nil {
 			s.lasterr = err
 			return false
@@ -169,50 +170,15 @@ func (s *streamReader) Next() bool {
 		}
 
 		//Read the feedpage at the current url
-		f, resp, err := s.client.readStream(s.currentURL)
+		f, _, err := s.client.readStream(s.currentURL)
 		if err != nil {
-			// If the response is nil, the error has occured before a http
-			// request. Typically s will be some protocol issue such as
-			// the eventstore server not being available.
-			if resp == nil {
-				s.lasterr = err
-				return true
-			}
-
-			// If the response is not nil the error has occured during the http
-			// request. The response contains further details on the error.
-			if resp != nil {
-				switch resp.StatusCode {
-				//If the stream does not exist an ErrStreamDoesNotExist will
-				//be returned. True is returned to let the client decide in
-				//their loop how to respond.
-				case http.StatusNotFound:
-					s.lasterr = &NotFoundError{}
-					return true
-				//If the request has insufficient permissions to access the
-				//stream ErrUnauthorized will be returned.
-				//True is returned to let the client decide in
-				//their loop how to respond.
-				case http.StatusUnauthorized:
-					s.lasterr = &UnauthorizedError{}
-					return true
-				//503 is also returned if the server is temporarily unable
-				//to handle the request
-				case http.StatusServiceUnavailable:
-					s.lasterr = &TemporarilyUnavailableError{}
-					return true
-				default:
-					s.lasterr = err
-					return true
-				}
-			}
+			s.lasterr = err
+			return true
 		}
 
 		s.feedPage = f
-
 		numEntries = len(f.Entry)
 		s.index = numEntries - 1
-
 	}
 
 	//If there are no events returned at the url return an error
@@ -221,9 +187,6 @@ func (s *streamReader) Next() bool {
 		s.lasterr = &NoMoreEventsError{}
 		return true
 	}
-
-	// prev := s.feedPage.GetLink("previous")
-	// fmt.Println(prev)
 
 	//There are events returned, get the event for the current version
 	entry := s.feedPage.Entry[s.index]
@@ -311,41 +274,13 @@ func (s *streamReader) LongPoll(seconds int) {
 // For more information on stream metadata see:
 // http://docs.geteventstore.com/http-api/3.7.0/stream-metadata/
 func (s *streamReader) MetaData() (*EventResponse, error) {
-
-	url, resp, err := s.client.GetMetadataURL(s.streamName)
+	url, _, err := s.client.GetMetadataURL(s.streamName)
 	if err != nil {
-		if resp == nil {
-			return nil, err
-		}
-
-		switch resp.StatusCode {
-		case http.StatusUnauthorized:
-			return nil, &UnauthorizedError{}
-		case http.StatusNotFound:
-			return nil, &NotFoundError{}
-		case http.StatusServiceUnavailable:
-			return nil, &TemporarilyUnavailableError{}
-		default:
-			return nil, err
-		}
+		return nil, err
 	}
-	ev, resp, err := s.client.GetEvent(url)
+	ev, _, err := s.client.GetEvent(url)
 	if err != nil {
-		if resp == nil {
-			return nil, err
-		}
-
-		switch resp.StatusCode {
-		case http.StatusUnauthorized:
-			return nil, &UnauthorizedError{}
-		case http.StatusNotFound:
-			return nil, &NotFoundError{}
-		case http.StatusServiceUnavailable:
-			return nil, &TemporarilyUnavailableError{}
-		default:
-			return nil, err
-		}
-
+		return nil, err
 	}
 	return ev, nil
 }

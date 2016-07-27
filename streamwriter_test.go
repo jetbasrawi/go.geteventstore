@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strconv"
 
 	. "gopkg.in/check.v1"
 )
@@ -88,33 +89,33 @@ func (s *StreamWriterSuite) TestAppendEventsMultiple(c *C) {
 	c.Assert(err, IsNil)
 }
 
-// func (s *StreamWriterSuite) TestAppendEventsWithConcurrencyError(c *C) {
-// 	data := &MyDataType{Field1: 445, Field2: "Some string"}
-// 	et := "SomeEventType"
-// 	ev := ToEventData("", et, data, nil)
+func (s *StreamWriterSuite) TestAppendEventsWithConcurrencyError(c *C) {
+	data := &MyDataType{Field1: 445, Field2: "Some string"}
+	et := "SomeEventType"
+	ev := ToEventData("", et, data, nil)
 
-// 	stream := "Some-Stream"
-// 	url := fmt.Sprintf("/streams/%s", stream)
+	stream := "Some-Stream"
+	url := fmt.Sprintf("/streams/%s", stream)
 
-// 	expectedVersion := 5
+	expectedVersion := 5
 
-// 	mux.HandleFunc(url, func(w http.ResponseWriter, r *http.Request) {
-// 		c.Assert(r.Method, Equals, http.MethodPost)
+	mux.HandleFunc(url, func(w http.ResponseWriter, r *http.Request) {
+		c.Assert(r.Method, Equals, http.MethodPost)
 
-// 		want := strconv.Itoa(expectedVersion)
-// 		got := r.Header.Get("ES-ExpectedVersion")
-// 		c.Assert(got, Equals, want)
+		want := strconv.Itoa(expectedVersion)
+		got := r.Header.Get("ES-ExpectedVersion")
+		c.Assert(got, Equals, want)
 
-// 		w.WriteHeader(http.StatusBadRequest)
+		w.WriteHeader(http.StatusBadRequest)
 
-// 		fmt.Fprint(w, "")
-// 	})
+		fmt.Fprint(w, "")
+	})
 
-// 	streamWriter := client.NewStreamWriter(stream)
-// 	err := streamWriter.Append(&expectedVersion, ev)
-// 	c.Assert(err, NotNil)
-// 	c.Assert(typeOf(err), DeepEquals, "ConcurrencyError")
-// }
+	streamWriter := client.NewStreamWriter(stream)
+	err := streamWriter.Append(&expectedVersion, ev)
+	c.Assert(err, NotNil)
+	c.Assert(typeOf(err), DeepEquals, "ConcurrencyError")
+}
 
 func (s *StreamWriterSuite) TestAppendStreamMetadata(c *C) {
 	eventType := "MetaData"
@@ -202,7 +203,6 @@ func (s *StreamWriterSuite) TestAppendStreamMetadataReturnsUnexpectedErrorWhenGe
 	stream := "SomeStream"
 	path := fmt.Sprintf("/streams/%s/0/forward/1", stream)
 	mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
-		fmt.Println(r.URL.String())
 		w.WriteHeader(http.StatusHTTPVersionNotSupported)
 		fmt.Fprint(w, "")
 	})

@@ -17,7 +17,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/jetbasrawi/goes/internal/atom"
 )
 
@@ -188,10 +187,6 @@ func (h *AtomFeedSimulator) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // If the url defines a set larger than the events passed in the returned events
 // will only contain the events available.
 func CreateTestFeed(es []*Event, feedURL string) (*atom.Feed, error) {
-	if len(es) <= 0 {
-		spew.Dump(es)
-		fmt.Println(feedURL)
-	}
 
 	r, err := parseURL(feedURL)
 	if err != nil {

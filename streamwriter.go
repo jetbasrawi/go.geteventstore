@@ -6,7 +6,7 @@ import (
 	"strconv"
 )
 
-//StreamWriter
+// StreamWriter is the interface that stream writers should implement
 type StreamWriter interface {
 	Append(*int, ...*Event) error
 	WriteMetaData(string, interface{}) error
@@ -70,16 +70,6 @@ func (s *streamWriter) WriteMetaData(stream string, metadata interface{}) error 
 	m := ToEventData("", "MetaData", metadata, nil)
 	mURL, _, err := s.client.GetMetadataURL(stream)
 	if err != nil {
-		if e, ok := err.(*ErrorResponse); ok {
-			switch e.StatusCode {
-			case http.StatusUnauthorized:
-				return &UnauthorizedError{ErrorResponse: e}
-			case http.StatusServiceUnavailable:
-				return &TemporarilyUnavailableError{ErrorResponse: e}
-			default:
-				return &UnexpectedError{ErrorResponse: e}
-			}
-		}
 		return err
 	}
 	req, err := s.client.newRequest(http.MethodPost, mURL, m)
@@ -91,46 +81,8 @@ func (s *streamWriter) WriteMetaData(stream string, metadata interface{}) error 
 
 	_, err = s.client.do(req, nil)
 	if err != nil {
-		if e, ok := err.(*ErrorResponse); ok {
-			switch e.StatusCode {
-			case http.StatusUnauthorized:
-				return &UnauthorizedError{ErrorResponse: e}
-			case http.StatusServiceUnavailable:
-				return &TemporarilyUnavailableError{ErrorResponse: e}
-			default:
-				return &UnexpectedError{ErrorResponse: e}
-			}
-		}
 		return err
 	}
 
 	return nil
 }
-
-//// UpdateMetaData updates the metadata for a stream
-////
-//// The operation will replace the current stream metadata
-////
-//// For more information on stream metadata see:
-//// http://docs.geteventstore.com/http-api/3.6.0/stream-metadata/
-//func (c *Client) UpdateStreamMetaData(stream string, metadata interface{}) (*Response, error) {
-
-//m := ToEventData("", "MetaData", metadata, nil)
-//mURL, resp, err := c.getMetadataURL(stream)
-//if err != nil {
-//return resp, err
-//}
-//req, err := c.newRequest("POST", mURL, m)
-//if err != nil {
-//return resp, err
-//}
-
-//req.Header.Set("Content-Type", "application/vnd.eventstore.events+json")
-
-//resp, err = c.do(req, nil)
-//if err != nil {
-//return resp, err
-//}
-
-//return resp, nil
-//}

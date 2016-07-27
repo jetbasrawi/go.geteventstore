@@ -20,7 +20,9 @@ type basicAuthCredentials struct {
 	Password string
 }
 
-// client is the object used to interact with the eventstore.
+//TODO: Create a client interface type so that the type can be unexported
+
+// Client is the type used to interact with the eventstore.
 //
 // Use the NewClient constructor to get a client.
 type Client struct {
@@ -54,6 +56,7 @@ func NewClient(httpClient *http.Client, serverURL string) (*Client, error) {
 	return c, nil
 }
 
+// NewStreamReader constructs a new StreamReader instance
 func (c *Client) NewStreamReader(streamName string) StreamReader {
 	return &streamReader{
 		streamName: streamName,
@@ -63,6 +66,7 @@ func (c *Client) NewStreamReader(streamName string) StreamReader {
 	}
 }
 
+// NewStreamWriter constructs a new StreamWriter instance
 func (c *Client) NewStreamWriter(streamName string) StreamWriter {
 	return &streamWriter{
 		client:     c,
@@ -71,6 +75,10 @@ func (c *Client) NewStreamWriter(streamName string) StreamWriter {
 }
 
 func (c *Client) do(req *http.Request, v io.Writer) (*Response, error) {
+
+	// keep is a copy of the request body that will be returned
+	// with the response for diagnostic purposes.
+	// send will be used to make the request.
 	var keep, send io.ReadCloser
 
 	if req.Body != nil {
@@ -80,21 +88,32 @@ func (c *Client) do(req *http.Request, v io.Writer) (*Response, error) {
 			req.Body = send
 		}
 	}
+
+	// An error is returned if caused by client policy (such as CheckRedirect),
+	// or if there was an HTTP protocol error. A non-2xx response doesn't cause
+	// an error.
 	resp, err := c.client.Do(req)
 	if err != nil {
+		//TODO: Return a custom error wrapper
 		return nil, err
 	}
 
 	defer resp.Body.Close()
 
+	// Create a *Response to wrap the http.Response
 	response := newResponse(resp)
 
+	// After the request has been made the req.Body will be unreadable.
+	// assign keep to the request body so that it can be returned in the
+	// response for diagnostic purposes.
 	if keep != nil {
 		req.Body = keep
 	}
-	err = checkResponse(resp, req)
-	if err != nil {
 
+	// If the request returned an error status checkResponse will return an
+	// *errorResponse containing the original request, status code and status message
+	err = getError(resp, req)
+	if err != nil {
 		// even though there was an error, we still return the response
 		// in case the caller wants to inspect it further
 		return response, err
@@ -105,7 +124,42 @@ func (c *Client) do(req *http.Request, v io.Writer) (*Response, error) {
 		io.Copy(v, resp.Body)
 	}
 
-	return response, err
+	return response, nil
+}
+
+func getError(r *http.Response, req *http.Request) error {
+	if c := r.StatusCode; 200 <= c && c <= 299 {
+		return nil
+	}
+
+	errorResponse := &ErrorResponse{Response: r}
+	data, err := ioutil.ReadAll(r.Body)
+	if err == nil && data != nil {
+		json.Unmarshal(data, errorResponse)
+	}
+	errorResponse.Message = r.Status
+	errorResponse.StatusCode = r.StatusCode
+	errorResponse.Request = req
+
+	switch r.StatusCode {
+	case http.StatusBadRequest:
+		// In general it is considered bad practice to use error messages
+		// to control flow, but it really helps the useability of the API
+		// to be able to distinguish between concurrency errors and
+		// other types of bad request which will all return status 400
+		if r.Status == "400 Wrong expected EventNumber" {
+			return &ConcurrencyError{ErrorResponse: errorResponse}
+		}
+		return &BadRequestError{ErrorResponse: errorResponse}
+	case http.StatusUnauthorized:
+		return &UnauthorizedError{ErrorResponse: errorResponse}
+	case http.StatusServiceUnavailable:
+		return &TemporarilyUnavailableError{ErrorResponse: errorResponse}
+	case http.StatusNotFound:
+		return &NotFoundError{ErrorResponse: errorResponse}
+	default:
+		return &UnexpectedError{ErrorResponse: errorResponse}
+	}
 }
 
 // SetBasicAuth sets the credentials for requests.
@@ -369,22 +423,6 @@ func getFeedURL(stream, direction string, version int, take *Take, pageSize int)
 	ver = strconv.Itoa(version)
 
 	return fmt.Sprintf("/streams/%s/%s/%s/%d", stream, ver, dir, ps), nil
-}
-
-func checkResponse(r *http.Response, req *http.Request) error {
-	if c := r.StatusCode; 200 <= c && c <= 299 {
-		return nil
-	}
-	errorResponse := &ErrorResponse{Response: r}
-	data, err := ioutil.ReadAll(r.Body)
-	if err == nil && data != nil {
-		json.Unmarshal(data, errorResponse)
-	}
-	errorResponse.Message = r.Status
-	errorResponse.StatusCode = r.StatusCode
-	errorResponse.Request = req
-
-	return errorResponse
 }
 
 // newResponse creates a new Response for the provided http.Response.

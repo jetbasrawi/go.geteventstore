@@ -73,7 +73,7 @@ func (s *StreamReaderSuite) TestNextReturnsErrorIfStreamDoesNotExist(c *C) {
 	stream := client.NewStreamReader("Something")
 	ok := stream.Next()
 	c.Assert(ok, Equals, true)
-	c.Assert(stream.Err(), DeepEquals, &NotFoundError{})
+	c.Assert(typeOf(stream.Err()), DeepEquals, "NotFoundError")
 }
 
 // Tests that the stream returns appropriate error when the request results in
@@ -87,7 +87,7 @@ func (s *StreamReaderSuite) TestNextErrorsIfNotAuthorisedToAccessStream(c *C) {
 	stream := client.NewStreamReader("Something")
 	ok := stream.Next()
 	c.Assert(ok, Equals, true)
-	c.Assert(stream.Err(), DeepEquals, &UnauthorizedError{})
+	c.Assert(typeOf(stream.Err()), DeepEquals, "UnauthorizedError")
 }
 
 // Testing the case where next has reached the end of the stream and there are
