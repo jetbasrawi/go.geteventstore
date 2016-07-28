@@ -23,7 +23,7 @@ type StreamReader interface {
 
 type streamReader struct {
 	streamName    string
-	client        *Client
+	client        Client
 	version       int
 	nextVersion   int
 	index         int
@@ -148,7 +148,7 @@ func (s *streamReader) Next() bool {
 	// version number.
 	if s.feedPage == nil {
 		s.index = -1
-		url, err := getFeedURL(s.streamName, "forward", s.nextVersion, nil, s.pageSize)
+		url, err := getFeedURL(s.streamName, "forward", s.nextVersion, s.pageSize)
 		if err != nil {
 			s.lasterr = err
 			return false
@@ -170,7 +170,7 @@ func (s *streamReader) Next() bool {
 		}
 
 		//Read the feedpage at the current url
-		f, _, err := s.client.readStream(s.currentURL)
+		f, _, err := s.client.ReadFeed(s.currentURL)
 		if err != nil {
 			s.lasterr = err
 			return true
@@ -261,9 +261,9 @@ func (s *streamReader) Scan(e interface{}, m interface{}) error {
 // wait to return.
 func (s *streamReader) LongPoll(seconds int) {
 	if seconds > 0 {
-		s.client.headers["ES-LongPoll"] = strconv.Itoa(seconds)
+		s.client.SetHeader("ES-LongPoll", strconv.Itoa(seconds))
 	} else {
-		delete(s.client.headers, "ES-LongPoll")
+		s.client.DeleteHeader("ES-LongPoll")
 	}
 }
 

@@ -542,7 +542,7 @@ func (s *SimSuite) TestTrickleFeed(c *C) {
 	}
 	mux.Handle("/", handler)
 
-	reader := client.NewStreamReader(stream)
+	reader := eventStoreClient.NewStreamReader(stream)
 
 	count := 0
 	for reader.Next() {

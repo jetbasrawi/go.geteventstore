@@ -33,8 +33,8 @@ var (
 	// mux is the HTTP request multiplexer used with the test server
 	mux *http.ServeMux
 
-	// client is the EventStore client being tested
-	client *Client
+	// eventStoreClient is the EventStore client being tested
+	eventStoreClient Client
 
 	// server is a test HTTP server used to provide mack API responses
 	server *httptest.Server
@@ -44,7 +44,12 @@ func setup() {
 	mux = http.NewServeMux()
 	server = httptest.NewServer(mux)
 
-	client, _ = NewClient(nil, server.URL)
+	baseURL, _ := url.Parse(server.URL)
+	eventStoreClient = &client{
+		client:  http.DefaultClient,
+		baseURL: baseURL,
+		headers: make(map[string]string),
+	}
 }
 
 func setupSimulator(es []*Event, m *Event) {

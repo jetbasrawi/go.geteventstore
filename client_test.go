@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"reflect"
 	"strings"
+	"time"
 
 	. "gopkg.in/check.v1"
 )
@@ -21,6 +23,15 @@ func (s *ClientSuite) SetUpTest(c *C) {
 }
 func (s *ClientSuite) TearDownTest(c *C) {
 	teardown()
+}
+
+func newTestClient() *client {
+	baseURL, _ := url.Parse(server.URL)
+	return &client{
+		client:  http.DefaultClient,
+		baseURL: baseURL,
+		headers: make(map[string]string),
+	}
 }
 
 func (s *ClientSuite) TestReadStream(c *C) {
@@ -37,7 +48,7 @@ func (s *ClientSuite) TestReadStream(c *C) {
 		c.Assert(r.Header.Get("Accept"), Equals, "application/atom+xml")
 	})
 
-	feed, resp, _ := client.readStream(url)
+	feed, resp, _ := eventStoreClient.ReadFeed(url)
 	c.Assert(feed.PrettyPrint(), DeepEquals, f.PrettyPrint())
 	c.Assert(resp.StatusCode, DeepEquals, http.StatusOK)
 }
@@ -59,25 +70,23 @@ func (s *ClientSuite) TestUnmarshalFeed(c *C) {
 	c.Assert(got, DeepEquals, want)
 }
 
-func (s *ClientSuite) TestNewClient(c *C) {
+func (s *ClientSuite) TestConstructNewClient(c *C) {
 	invalidURL := ":"
-	client, err := NewClient(nil, invalidURL)
+	ct, err := NewClient(nil, invalidURL)
 	c.Assert(err, ErrorMatches, "parse :: missing protocol scheme")
 
-	client, _ = NewClient(nil, defaultBaseURL)
-	got, want := client.BaseURL.String(), defaultBaseURL
-	c.Assert(got, Equals, want)
+	if cl, ok := ct.(*client); ok {
+		got, want := cl.baseURL.String(), defaultBaseURL
+		c.Assert(got, Equals, want)
+	}
 }
 
 func (s *ClientSuite) TestNewRequest(c *C) {
-	client, _ := NewClient(nil, defaultBaseURL)
-	inURL, outURL := "/foo", defaultBaseURL+"foo"
-	inBody := &Event{EventID: "some-uuid", EventType: "SomeEventType", Data: "some-string"}
+	reqURL, outURL := "/foo", server.URL+"/foo"
+	reqBody := &Event{EventID: "some-uuid", EventType: "SomeEventType", Data: "some-string"}
 	eventStructJSON := `{"eventType":"SomeEventType","eventId":"some-uuid","data":"some-string"}`
 	outBody := eventStructJSON + "\n"
-	req, _ := client.newRequest("GET", inURL, inBody)
-
-	contentType := "application/vnd.eventstore.events+json"
+	req, _ := eventStoreClient.NewRequest("GET", reqURL, reqBody)
 
 	// test that the relative url was concatenated
 	c.Assert(req.URL.String(), Equals, outURL)
@@ -85,11 +94,9 @@ func (s *ClientSuite) TestNewRequest(c *C) {
 	// test that body was JSON encoded
 	body, _ := ioutil.ReadAll(req.Body)
 	c.Assert(string(body), Equals, outBody)
-	c.Assert(req.Header.Get("Content-Type"), Equals, contentType)
 }
 
 func (s *ClientSuite) TestRequestsAreSentWithBasicAuthIfSet(c *C) {
-
 	username := "user"
 	password := "pass"
 	headerStr := "Basic " + base64.StdEncoding.EncodeToString([]byte(username+":"+password))
@@ -101,28 +108,25 @@ func (s *ClientSuite) TestRequestsAreSentWithBasicAuthIfSet(c *C) {
 		fmt.Fprintf(w, "")
 	})
 
-	client.SetBasicAuth("user", "pass")
-	streamReader := client.NewStreamReader("something")
+	eventStoreClient.SetBasicAuth("user", "pass")
+	streamReader := eventStoreClient.NewStreamReader("something")
 	_ = streamReader.Next()
 	c.Assert(authFound, Equals, true)
-
 }
 
 func (s *ClientSuite) TestNewRequestWithInvalidJSONReturnsError(c *C) {
-	client, _ := NewClient(nil, defaultBaseURL)
 	type T struct {
 		A map[int]interface{}
 	}
 	ti := &T{}
-	_, err := client.newRequest("GET", "/", ti)
+	_, err := eventStoreClient.NewRequest(http.MethodGet, "/", ti)
 	c.Assert(err, NotNil)
 	tp := reflect.TypeOf(ti.A)
-	c.Assert(err, FitsTypeOf, &json.UnsupportedTypeError{tp})
+	c.Assert(err, FitsTypeOf, &json.UnsupportedTypeError{Type: tp})
 }
 
 func (s *ClientSuite) TestNewRequestWithBadURLReturnsError(c *C) {
-	clit, _ := NewClient(nil, defaultBaseURL)
-	_, err := clit.newRequest("GET", ":", nil)
+	_, err := eventStoreClient.NewRequest(http.MethodGet, ":", nil)
 	c.Assert(err, ErrorMatches, "parse :: missing protocol scheme")
 }
 
@@ -133,8 +137,7 @@ func (s *ClientSuite) TestNewRequestWithBadURLReturnsError(c *C) {
 // certain cases, intermediate systems may treat these differently resulting in
 // subtle errors.
 func (s *ClientSuite) TestNewRequestWithEmptyBody(c *C) {
-	clit, _ := NewClient(nil, defaultBaseURL)
-	req, err := clit.newRequest("GET", "/", nil)
+	req, err := eventStoreClient.NewRequest(http.MethodGet, "/", nil)
 	c.Assert(err, IsNil)
 	c.Assert(req.Body, IsNil)
 }
@@ -145,13 +148,13 @@ func (s *ClientSuite) TestDo(c *C) {
 	body := te[0].Data
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		c.Assert(r.Method, Equals, "POST")
+		c.Assert(r.Method, Equals, http.MethodPost)
 		w.WriteHeader(http.StatusCreated)
 		fmt.Fprint(w, body)
 	})
 
-	req, _ := client.newRequest("POST", "/", nil)
-	resp, err := client.do(req, nil)
+	req, _ := eventStoreClient.NewRequest(http.MethodPost, "/", nil)
+	resp, err := eventStoreClient.Do(req, nil)
 	c.Assert(err, IsNil)
 
 	want := &Response{
@@ -168,9 +171,9 @@ func (s *ClientSuite) TestErrorResponseContainsCopyOfTheOriginalRequest(c *C) {
 		fmt.Fprintf(w, "")
 	})
 
-	req, _ := client.newRequest("POST", "/", "[{\"some_field\": 34534}]")
+	req, _ := eventStoreClient.NewRequest(http.MethodPost, "/", "[{\"some_field\": 34534}]")
 
-	_, err := client.do(req, nil)
+	_, err := eventStoreClient.Do(req, nil)
 
 	if e, ok := err.(*BadRequestError); ok {
 		c.Assert(e.ErrorResponse.Request, DeepEquals, req)
@@ -185,9 +188,9 @@ func (s *ClientSuite) TestErrorResponseContainsStatusCodeAndMessage(c *C) {
 		fmt.Fprintf(w, "Response Body")
 	})
 
-	req, _ := client.newRequest("POST", "/", nil)
+	req, _ := eventStoreClient.NewRequest(http.MethodPost, "/", nil)
 
-	_, err := client.do(req, nil)
+	_, err := eventStoreClient.Do(req, nil)
 
 	if e, ok := err.(*BadRequestError); ok {
 		c.Assert(e.ErrorResponse.StatusCode, Equals, http.StatusBadRequest)
@@ -208,4 +211,40 @@ func (s *ClientSuite) TestNewResponse(c *C) {
 
 	c.Assert(resp.Status, Equals, "201 Created")
 	c.Assert(resp.StatusCode, Equals, http.StatusCreated)
+}
+
+func (s *ClientSuite) TestGetEvent(c *C) {
+	stream := "GetEventStream"
+	es := CreateTestEvents(1, stream, server.URL, "SomeEventType")
+	ti := Time(time.Now())
+
+	want := CreateTestEventResponse(es[0], &ti)
+
+	er, _ := CreateTestEventAtomResponse(es[0], &ti)
+	str := er.PrettyPrint()
+
+	mux.HandleFunc("/streams/some-stream/299", func(w http.ResponseWriter, r *http.Request) {
+		got := r.Header.Get("Accept")
+		want := "application/vnd.eventstore.atom+json"
+		c.Assert(got, Equals, want)
+
+		fmt.Fprint(w, str)
+	})
+
+	got, _, err := eventStoreClient.GetEvent("/streams/some-stream/299")
+	c.Assert(err, IsNil)
+	c.Assert(got.PrettyPrint(), Equals, want.PrettyPrint())
+}
+
+func (s *ClientSuite) TestGetEventURLs(c *C) {
+	es := CreateTestEvents(2, "some-stream", "http://localhost:2113", "EventTypeX")
+	f, _ := CreateTestFeed(es, "http://localhost:2113/streams/some-stream/head/backward/2")
+
+	got, err := getEventURLs(f)
+	c.Assert(err, IsNil)
+	want := []string{
+		"http://localhost:2113/streams/some-stream/1",
+		"http://localhost:2113/streams/some-stream/0",
+	}
+	c.Assert(got, DeepEquals, want)
 }

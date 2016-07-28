@@ -41,15 +41,15 @@ func (s *StreamWriterSuite) TestAppendEventsSingle(c *C) {
 		c.Assert(err, IsNil)
 		c.Assert(se[0].PrettyPrint(), Equals, ev.PrettyPrint())
 
-		mt := "application/vnd.eventstore.events+json"
-		mediaType := r.Header.Get("Content-Type")
-		c.Assert(mt, Equals, mediaType)
+		ct := "application/vnd.eventstore.events+json"
+		contentType := r.Header.Get("Content-Type")
+		c.Assert(ct, Equals, contentType)
 
 		w.WriteHeader(http.StatusCreated)
 		fmt.Fprint(w, "")
 	})
 
-	streamWriter := client.NewStreamWriter(streamName)
+	streamWriter := eventStoreClient.NewStreamWriter(streamName)
 	err := streamWriter.Append(nil, ev)
 
 	c.Assert(err, IsNil)
@@ -75,15 +75,11 @@ func (s *StreamWriterSuite) TestAppendEventsMultiple(c *C) {
 		c.Assert(se[0].PrettyPrint(), Equals, ev1.PrettyPrint())
 		c.Assert(se[1].PrettyPrint(), Equals, ev2.PrettyPrint())
 
-		mt := "application/vnd.eventstore.events+json"
-		mediaType := r.Header.Get("Content-Type")
-		c.Assert(mt, Equals, mediaType)
-
 		w.WriteHeader(http.StatusCreated)
 		fmt.Fprint(w, "")
 	})
 
-	streamWriter := client.NewStreamWriter(stream)
+	streamWriter := eventStoreClient.NewStreamWriter(stream)
 	err := streamWriter.Append(nil, ev1, ev2)
 
 	c.Assert(err, IsNil)
@@ -112,7 +108,7 @@ func (s *StreamWriterSuite) TestAppendEventsWithConcurrencyError(c *C) {
 	})
 
 	//client.client.Transport = newMockTransport()
-	streamWriter := client.NewStreamWriter(stream)
+	streamWriter := eventStoreClient.NewStreamWriter(stream)
 	err := streamWriter.Append(&expectedVersion, ev)
 	//client.client.Transport = http.DefaultTransport
 	c.Assert(err, NotNil)
@@ -148,11 +144,15 @@ func (s *StreamWriterSuite) TestAppendStreamMetadata(c *C) {
 		c.Assert(err, IsNil)
 		c.Assert(got, DeepEquals, want)
 
+		mt := "application/vnd.eventstore.events+json"
+		mediaType := r.Header.Get("Content-Type")
+		c.Assert(mt, Equals, mediaType)
+
 		w.WriteHeader(http.StatusCreated)
 		fmt.Fprint(w, "")
 	})
 
-	writer := client.NewStreamWriter(stream)
+	writer := eventStoreClient.NewStreamWriter(stream)
 	err := writer.WriteMetaData(stream, &want)
 	c.Assert(err, IsNil)
 }
@@ -168,7 +168,7 @@ func (s *StreamWriterSuite) TestAppendStreamMetadataReturnsUnauthorisedWhenGetti
 	meta := fmt.Sprintf("{\"baz\":\"boo\"}")
 	want := json.RawMessage(meta)
 
-	writer := client.NewStreamWriter(stream)
+	writer := eventStoreClient.NewStreamWriter(stream)
 	err := writer.WriteMetaData(stream, &want)
 
 	c.Assert(err, NotNil)
@@ -190,7 +190,7 @@ func (s *StreamWriterSuite) TestAppendStreamMetadataReturnsTemporarilyUnavailabl
 	meta := fmt.Sprintf("{\"baz\":\"boo\"}")
 	want := json.RawMessage(meta)
 
-	writer := client.NewStreamWriter(stream)
+	writer := eventStoreClient.NewStreamWriter(stream)
 	err := writer.WriteMetaData(stream, &want)
 
 	c.Assert(err, NotNil)
@@ -212,7 +212,7 @@ func (s *StreamWriterSuite) TestAppendStreamMetadataReturnsUnexpectedErrorWhenGe
 	meta := fmt.Sprintf("{\"baz\":\"boo\"}")
 	want := json.RawMessage(meta)
 
-	writer := client.NewStreamWriter(stream)
+	writer := eventStoreClient.NewStreamWriter(stream)
 	err := writer.WriteMetaData(stream, &want)
 
 	c.Assert(err, NotNil)
@@ -249,7 +249,7 @@ func (s *StreamWriterSuite) TestAppendStreamMetadataReturnsUnexpectedErrorWhenWr
 		fmt.Fprint(w, "")
 	})
 
-	writer := client.NewStreamWriter(stream)
+	writer := eventStoreClient.NewStreamWriter(stream)
 	err := writer.WriteMetaData(stream, &want)
 
 	c.Assert(err, NotNil)
@@ -286,7 +286,7 @@ func (s *StreamWriterSuite) TestAppendStreamMetadataReturnsUnauthorizedErrorWhen
 		fmt.Fprint(w, "")
 	})
 
-	writer := client.NewStreamWriter(stream)
+	writer := eventStoreClient.NewStreamWriter(stream)
 	err := writer.WriteMetaData(stream, &want)
 
 	c.Assert(err, NotNil)
@@ -323,7 +323,7 @@ func (s *StreamWriterSuite) TestAppendStreamMetadataReturnsTemporarilyUnavailabl
 		fmt.Fprint(w, "")
 	})
 
-	writer := client.NewStreamWriter(stream)
+	writer := eventStoreClient.NewStreamWriter(stream)
 	err := writer.WriteMetaData(stream, &want)
 
 	c.Assert(err, NotNil)
