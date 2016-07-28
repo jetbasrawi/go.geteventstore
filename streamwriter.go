@@ -44,6 +44,9 @@ func (s *streamWriter) Append(expectedVersion *int, events ...*Event) error {
 
 	_, err = s.client.do(req, nil)
 	if err != nil {
+		if e, ok := err.(*BadRequestError); ok {
+			return &ConcurrencyError{ErrorResponse: e.ErrorResponse}
+		}
 		return err
 	}
 

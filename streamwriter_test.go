@@ -107,12 +107,14 @@ func (s *StreamWriterSuite) TestAppendEventsWithConcurrencyError(c *C) {
 		c.Assert(got, Equals, want)
 
 		w.WriteHeader(http.StatusBadRequest)
-
 		fmt.Fprint(w, "")
+
 	})
 
+	//client.client.Transport = newMockTransport()
 	streamWriter := client.NewStreamWriter(stream)
 	err := streamWriter.Append(&expectedVersion, ev)
+	//client.client.Transport = http.DefaultTransport
 	c.Assert(err, NotNil)
 	c.Assert(typeOf(err), DeepEquals, "ConcurrencyError")
 }

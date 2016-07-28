@@ -143,13 +143,6 @@ func getError(r *http.Response, req *http.Request) error {
 
 	switch r.StatusCode {
 	case http.StatusBadRequest:
-		// In general it is considered bad practice to use error messages
-		// to control flow, but it really helps the useability of the API
-		// to be able to distinguish between concurrency errors and
-		// other types of bad request which will all return status 400
-		if r.Status == "400 Wrong expected EventNumber" {
-			return &ConcurrencyError{ErrorResponse: errorResponse}
-		}
 		return &BadRequestError{ErrorResponse: errorResponse}
 	case http.StatusUnauthorized:
 		return &UnauthorizedError{ErrorResponse: errorResponse}
