@@ -1,73 +1,69 @@
+// This example demonstrates how to write and read events and event metadata
+
 package main
 
 import (
 	"log"
-	"net/http"
-	"net/http/httptest"
 	"net/url"
 	"time"
 
 	"github.com/jetbasrawi/goes"
 )
 
-var (
-	mux       *http.ServeMux
-	server    *httptest.Server
-	numEvents = 25
-)
-
-func init() {
-
-	// This example code uses the atom feed simulator.
-	// the following code simply initialises the simulator
-	mux = http.NewServeMux()
-	server = httptest.NewServer(mux)
-
-	u, _ := url.Parse(server.URL)
-	es := goes.CreateTestEvents(numEvents, "FooStream", server.URL, "FooEvent")
-
-	handler, err := goes.NewAtomFeedSimulator(es, u, nil, 10)
-	if err != nil {
-		log.Fatal(err)
-	}
-	mux.Handle("/", handler)
-}
-
-// FooEvent is a struct to hold test event data
+// FooEvent is an example event type
+//
+// An event within your application will just be a plain go struct.
+// The event will be serialized and deserialised to JSON and all of
+// the standard golang JSON serialisation features apply. Here the
+// struct does not use tags to specify a different name for the JSON
+// fields or wether a field is optional. The name of the field as it
+// is will be used.
 type FooEvent struct {
-	Foo string `json:"foo"`
+	FooField string
+	BarField string
+	BazField int
 }
 
 func main() {
 
-	// Create a client providing the full URL to your eventstore server
-	client, err := goes.NewClient(nil, server.URL)
+	// Creating a new Goes client.
+	client, err := goes.NewClient(nil, "http://localhost:2113")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	streamName := "FooStream"
+	// Set authentication credentials
+	client.SetBasicAuth("admin", "changeit")
 
-	// Create a new stream reader for FooStream
+	streamName := "foostream"
+
+	// Write some events to the eventstore
+	writeEvents(client, streamName)
+
+	// Read the events back
+	readEvents(client, streamName)
+
+}
+
+func readEvents(client goes.Client, streamName string) {
+	// Create a new stream reader
 	reader := client.NewStreamReader(streamName)
 
 	// The reader will default to version 0 and the first event returned in that
 	// case will be the event at 0 on the stream. To begin reading from a
 	// specific version call the NextVersion(int) method.
 	// In this case the reader will begin reading at event number 5
-	reader.NextVersion(5)
 
 	// Basic Authentication credentials can be set on the client.
 	// Any request made will use these credentials.
 	// You can change the credentials on a client and any subsequent requests
 	// will use the new credentials. There is no need to create a new client
 	// or stream reader.
-	client.SetBasicAuth("admin", "changeit")
-
-	log.Printf("\n\n Will begin reading stream.\n\n")
 
 	// By default the first call to next on the stream reader will start
 	// cue up the event at version 0 if there are events to return
+	//
+	// To begin reading at a specific version use reader.NextVersion(2)
 	//
 	// Next() always return true. The boolean value returned is not intended
 	// to provide information about status or control flow. It is simply a
@@ -102,7 +98,7 @@ func main() {
 			// UnauthorizedError will be returned. For this example we assume
 			// that this is not recoverable and we exit.
 			case *goes.UnauthorizedError:
-				log.Fatalf("Not authorized to connect to the stream %s", streamName)
+				log.Fatal(err)
 
 			// When there are no events returned from the request a
 			// NoMoreEventsError is returned. This may happen when requesting
@@ -117,15 +113,10 @@ func main() {
 			// enumerate over the events in a stream and then to LongPoll when
 			// there are no more events to return.
 			case *goes.NoMoreEventsError:
-				// if reader.Version() >= numEvents-1 {
-				// 	log.Println("Finished polling head of stream. Exiting.")
-				// 	return
-				// }
+				//Finished reading all the events.
+				return
 
-				log.Println("No more events. Will poll head of stream.")
-				reader.LongPoll(5)
-
-			// Handle unexpected errors
+			// Handle any other errors
 			default:
 				log.Fatal(err)
 			}
@@ -158,10 +149,72 @@ func main() {
 
 			// Check for any errors that have occured during deserialization
 			if reader.Err() != nil {
-				log.Fatal(err)
+				log.Fatal(reader.Err())
 			}
 
 			log.Printf("\n Event %d returned %#v\n Meta returned %#v\n\n", reader.EventResponse().Event.EventNumber, fooEvent, fooMeta)
 		}
 	}
+}
+
+func writeEvents(client goes.Client, streamName string) {
+	// Create some events.
+	// Here we will create two events and their associated metadata demonstrating how
+	// to write events and event metadata to the eventstore
+
+	// Create an event of type FooEvent
+	event1 := &FooEvent{
+		FooField: "Lorem Ipsum",
+		BarField: "Dolor Sit Amet",
+		BazField: 42,
+	}
+
+	// Create a map for metadata. This could equally be a struct or anything that can be
+	// serialised and deserialised to JSON
+	event1Meta := make(map[string]string)
+	event1Meta["Foo"] = "consectetur adipiscing elit"
+
+	// Create a goes.Event which contains the event data and metadata.
+	//
+	// Here the eventID and EventType have been specified explicitly.
+	goesEvent1 := goes.ToEventData(goes.NewUUID(), "FooEvent", event1, event1Meta)
+
+	// Create another event of type foo event
+	event2 := &FooEvent{
+		FooField: "Mary had a little lamb",
+		BarField: "It's fleece was white as snow",
+		BazField: 1,
+	}
+
+	// This time the eventID and EventType have been left blank.
+	// The eventID will be an automatically generated uuid.
+	// The eventType will be reflected from the type and will be "FooEvent"
+	goesEvent2 := goes.ToEventData("", "", event2, nil)
+
+	//Writing to the stream
+
+	// Create a new streamwriter passing in the name of the stream you want to write to.
+	// If the stream does not exist, it will be created when events are written to it.
+	writer := client.NewStreamWriter(streamName)
+
+	// Write the events to the stream
+	// The first argument allows you to specify the expected version. Here expected version
+	// is nil and so the events will be appended at the head of the stream regardless of the
+	// version of the stream.
+	err := writer.Append(nil, goesEvent1, goesEvent2)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Lets repeat this but using an expected version that will cause an error
+	// to demonstrate handling concurrency errors
+	// This should result in a goes.ConcurrencyError
+	v := 0
+	err = writer.Append(&v, goesEvent1)
+	if err != nil {
+		log.Printf("Received expected error. %#v\n", err)
+	}
+
+	log.Printf("Written events to the eventStore.")
+
 }
