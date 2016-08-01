@@ -31,17 +31,26 @@ func init() {
 	mux = http.NewServeMux()
 	server = httptest.NewServer(mux)
 
+	// Create a collection of random test events for the server to return.
 	es := goes.CreateTestEvents(numEvents, "FooStream", server.URL, "FooEvent")
 
+	// The atom feed returned will use this url to populate those parts of the
+	// feed that contain urls such as links to events.
 	u, _ := url.Parse(server.URL)
+
+	// Create a new atom feed simulator
 	handler, err := goes.NewAtomFeedSimulator(es, u, nil, 10)
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	// Add the sim handler to the multiplexer
 	mux.Handle("/", handler)
 }
 
-// FooEvent is a struct to hold test event data
+// FooEvent is a struct to into which we will deserialize event data
+// Test events have a single field called Foo which are pupulated with
+// a random string, which is just a uuid string
 type FooEvent struct {
 	Foo string `json:"foo"`
 }
