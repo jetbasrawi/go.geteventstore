@@ -101,8 +101,8 @@ events can be found in the simulator example.
         fooMeta := make(map[string]string)
 
         // Call scan to deserialize the event data and meta data into your types
-        reader.Scan(&fooEvent, &fooMeta)
-        if reader.Err() != nil {
+        err := reader.Scan(&fooEvent, &fooMeta)
+        if err != nil {
             // Handle errors that occured during deserialization
         }
 

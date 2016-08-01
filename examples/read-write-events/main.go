@@ -138,10 +138,9 @@ func readEvents(client goes.Client, streamName string) {
 			fooMeta := make(map[string]string)
 
 			// Call scan on the reader passing in pointers to the event and meta data targets
-			reader.Scan(&fooEvent, &fooMeta)
-
+			err := reader.Scan(&fooEvent, &fooMeta)
 			// Check for any errors that have occurred during deserialization
-			if reader.Err() != nil {
+			if err != nil {
 				log.Fatal(reader.Err())
 			}
 
