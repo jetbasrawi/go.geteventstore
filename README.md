@@ -1,4 +1,4 @@
-#GOES [![License](https://img.shields.io/:AFNetworking.svg)](https://opensource.org/licenses/MIT)
+#GOES [![license](https://img.shields.io/github/license/mashape/apistatus.svg?maxAge=2592000)](https://opensource.org/licenses/MIT)
 
 ##A Golang HTTP Client for EventStore 
 
