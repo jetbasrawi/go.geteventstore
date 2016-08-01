@@ -1,8 +1,8 @@
-#GOES
+#GOES [![License](https://img.shields.io/:AFNetworking.svg)](https://opensource.org/licenses/MIT)
 
 ##A Golang HTTP Client for EventStore 
 
-GOES is a http client for GetEventStore (https://geteventstore.com) written in Go. The 
+GOES is a http client for [EventStore](https://geteventstore.com) written in Go. The 
 client abstracts interaction with the GetEventStore HTTP API providing easy to use features 
 for reading and writing events and event metadata.
 
