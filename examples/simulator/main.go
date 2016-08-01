@@ -155,7 +155,7 @@ func main() {
 			// the event data, event meta data and information about the
 			// event are available via the reader's EventResponse() method.
 
-			// One very important peice of data about the event is the event
+			// One very important piece of data about the event is the event
 			// type. The event type is a string containing the name of the event
 			// type and is useful in more realistic scenarios for selecting
 			// the correct type to pass to the scan method for deserialization.
@@ -173,7 +173,7 @@ func main() {
 			// data targets
 			reader.Scan(&fooEvent, &fooMeta)
 
-			// Check for any errors that have occured during deserialization
+			// Check for any errors that have occurred during deserialization
 			if reader.Err() != nil {
 				log.Fatal(reader.Err())
 			}

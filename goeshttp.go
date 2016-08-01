@@ -48,7 +48,7 @@ func (e UnauthorizedError) Error() string {
 // This error may be returned if a request is made to the server during startup. When
 // the server starts up initially and the client is completely unable to connect to the
 // server a *url.Error will be returned. Once the server is up but not ready to serve
-// requests a ServiceUnavailable error will be returned for a breif period.
+// requests a ServiceUnavailable error will be returned for a brief period.
 type TemporarilyUnavailableError struct {
 	ErrorResponse *ErrorResponse
 }

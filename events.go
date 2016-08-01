@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// TODO: Check this is being used
+// EventFactory is the interface that an event factory should implement
 type EventFactory interface {
 	GetEvent(string) interface{}
 }

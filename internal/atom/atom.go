@@ -5,6 +5,7 @@ import (
 	"time"
 )
 
+// Feed represents an atom feed page from the eventstore.
 type Feed struct {
 	XMLName      xml.Name `xml:"http://www.w3.org/2005/Atom feed"`
 	Title        string   `xml:"title"`
@@ -17,12 +18,13 @@ type Feed struct {
 	Entry        []*Entry `xml:"entry"`
 }
 
-func (this *Feed) GetLink(name string) *Link {
-	if this == nil {
+// GetLink gets the link with the name specified by the link argument.
+func (f *Feed) GetLink(name string) *Link {
+	if f == nil {
 		return nil
 	}
 
-	for _, v := range this.Link {
+	for _, v := range f.Link {
 		if v.Rel == name {
 			return &v
 		}
@@ -30,6 +32,7 @@ func (this *Feed) GetLink(name string) *Link {
 	return nil
 }
 
+// PrettyPrint returns an indented string representation of the feed.
 func (f *Feed) PrettyPrint() string {
 	b, err := xml.MarshalIndent(f, "", "	")
 	if err != nil {
@@ -38,6 +41,7 @@ func (f *Feed) PrettyPrint() string {
 	return string(b)
 }
 
+// Entry represents a feed entry.
 type Entry struct {
 	Title     string  `xml:"title"`
 	ID        string  `xml:"id"`
@@ -49,22 +53,27 @@ type Entry struct {
 	Content   *Text   `xml:"content"`
 }
 
+// Link represents a Link entry in the feed.
 type Link struct {
 	Rel  string `xml:"rel,attr"`
 	Href string `xml:"href,attr"`
 }
 
+// Person represents a person
 type Person struct {
 	Name string `xml:"name"`
 }
 
+// Text represents a text entry
 type Text struct {
 	Type string `xml:"type,attr,omitempty"`
 	Body string `xml:",chardata"`
 }
 
+// TimeStr is a formatted time string
 type TimeStr string
 
+// Time returns a TimeStr
 func Time(t time.Time) TimeStr {
 	return TimeStr(t.Format("2006-01-02T15:04:05-07:00"))
 }

@@ -133,7 +133,7 @@ func (s *streamReader) EventResponse() *EventResponse {
 // TemporarilyUnavailableError
 // 503 ServiceUnavailable is returned if the server is temporarily unable
 // to handle the request. This can occur during startup of the eventstore
-// for a breif period after the server has come online but is not yet ready
+// for a brief period after the server has come online but is not yet ready
 // to handle requests
 func (s *streamReader) Next() bool {
 	s.lasterr = nil

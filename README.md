@@ -9,6 +9,12 @@ for reading and writing events and event metadata.
 Below are some code examples giving a summary view of how the client works. To learn to use 
 the client in more detail, commented example code can be found in the examples directory.
 
+###Import the package
+```go 
+    import "github.com/jetbasrawi/goes"
+```
+
+
 ###Create a new client
 
 ```go

@@ -86,7 +86,7 @@ func (c *client) NewStreamWriter(streamName string) StreamWriter {
 
 // SetBasicAuth sets the credentials for requests.
 //
-// Requests will retreive the credentials from the client before each request and
+// Requests will retrieve the credentials from the client before each request and
 // so credentials can be changed without the need to create a new StreamReader or
 // StreamWriter.
 func (c *client) SetBasicAuth(username, password string) {
@@ -194,9 +194,9 @@ func (r *ErrorResponse) Error() string {
 //
 // The feed object returned may be nil in case of an error.
 // The *Response may also be nil if the error occurred before the http request.
-// If the error occured after the http request, the *Response will contain the
+// If the error occurred after the http request, the *Response will contain the
 // raw http response and status.
-// If the error occured during the http request an *ErrorResponse will be returned
+// If the error occurred during the http request an *ErrorResponse will be returned
 // and this will also contain the raw http request and status and an error message.
 func (c *client) ReadFeed(url string) (*atom.Feed, *Response, error) {
 

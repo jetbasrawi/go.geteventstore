@@ -59,7 +59,7 @@ func (s *streamWriter) Append(expectedVersion *int, events ...*Event) error {
 // If the metadata was written successfully the error returned will be nil.
 //
 // If an error occurs the error returned may be an UnauthorizedError, a
-// TemporarilyUnavailableError or an UnexpectedError if the error occured during a
+// TemporarilyUnavailableError or an UnexpectedError if the error occurred during a
 // http request to the server. In these cases, the *ErrorResponse will be available
 // for inspection as an ErrorResponse field on the error.
 // If an error occurred outside of the http request another type of error will be returned

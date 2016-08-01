@@ -124,7 +124,7 @@ func readEvents(client goes.Client, streamName string) {
 			// The event data and metadata and other useful information about the event
 			// are available via the reader's EventResponse() method.
 
-			// One very important peice of data available about the event is the event
+			// One very important piece of data available about the event is the event
 			// type. The event type is a string containing the name of the event
 			// type and is useful in more realistic scenarios for identifying which event type
 			// has been returned and so pass the correct event type to the scan method for
@@ -140,7 +140,7 @@ func readEvents(client goes.Client, streamName string) {
 			// Call scan on the reader passing in pointers to the event and meta data targets
 			reader.Scan(&fooEvent, &fooMeta)
 
-			// Check for any errors that have occured during deserialization
+			// Check for any errors that have occurred during deserialization
 			if reader.Err() != nil {
 				log.Fatal(reader.Err())
 			}
