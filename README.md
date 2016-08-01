@@ -1,4 +1,4 @@
-#GOES [![license](https://img.shields.io/github/license/mashape/apistatus.svg?maxAge=2592000)](https://opensource.org/licenses/MIT)
+#GOES [![license](https://img.shields.io/github/license/mashape/apistatus.svg?maxAge=2592000)](https://opensource.org/licenses/MIT) [![Go Report Card](https://goreportcard.com/badge/github.com/jetbasrawi/goes)](https://goreportcard.com/report/github.com/jetbasrawi/goes)
 
 ##A Golang HTTP Client for EventStore 
 
