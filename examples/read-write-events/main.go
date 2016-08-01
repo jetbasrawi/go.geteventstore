@@ -49,38 +49,40 @@ func readEvents(client goes.Client, streamName string) {
 	// Create a new stream reader
 	reader := client.NewStreamReader(streamName)
 
-	// The reader will default to version 0 and the first event returned in that
-	// case will be the event at 0 on the stream. To begin reading from a
-	// specific version call the NextVersion(int) method.
-	// In this case the reader will begin reading at event number 5
+	// To begin reading from a stream from a specific version call the
+	// NextVersion(int) method.
+	// After a call to next, the event returned will be the event at the version
+	// specified by NextVersion. In this example code we do not specify a version
+	// and the reader uses the default of 0
 
 	// Basic Authentication credentials can be set on the client.
-	// Any request made will use these credentials.
+	// Any request made will use these credentials until they are changed.
 	// You can change the credentials on a client and any subsequent requests
-	// will use the new credentials. There is no need to create a new client
-	// or stream reader.
+	// will use the new credentials.
 
-	// By default the first call to next on the stream reader will start
-	// cue up the event at version 0 if there are events to return
+	// By default the first call to next on the stream reader will
+	// cue up the event at version 0.
 	//
 	// To begin reading at a specific version use reader.NextVersion(2)
 	//
-	// Next() always return true. The boolean value returned is not intended
+	// Next() always returns true. The boolean value returned is not intended
 	// to provide information about status or control flow. It is simply a
 	// convenient mechanism to facilitate an enumeration.
 	for reader.Next() {
 
 		// There are a number of errors that can occur when calling Next()
-		// All of the events returned are typed.
+		// All of the events returned are typed so they can all be handled
+		// in a consistent manner and can contain supporting data such as
+		// the http request and response.
 		if reader.Err() != nil {
 			switch err := reader.Err().(type) {
 
 			// In the case of network and protocol errors such as when the
 			// eventstore server is not online at the url provided a standard
-			// *url.Error is returned. The causes of the error can be inspected
-			// via this error. In this example we assume that we are waiting for
-			// the server to come online and will respond to this error with a
-			// retry after some time.
+			// *url.Error is returned.
+			// In this example we assume that we are waiting for the server to
+			// to come online and will respond to this error with a retry after
+			// some time.
 			// When the eventstore comes online there is a short period where
 			// it responds with a StatusServiceUnavailable. The goes client
 			// returns a TemporarilyUnavailableError and here we respond to this
@@ -100,18 +102,11 @@ func readEvents(client goes.Client, streamName string) {
 			case *goes.UnauthorizedError:
 				log.Fatal(err)
 
-			// When there are no events returned from the request a
-			// NoMoreEventsError is returned. This may happen when requesting
-			// events past the head of the stream.
-			// In this example we respond by setting the reader to LongPoll.
-			// The effect of this is that any subsequent calls to Next() will
-			// block, waiting for the eventstore to either return events or
-			// return nothing after the number of seconds specified in the call
-			// to LongPoll.
-			// This is how we can implement a form of subscription to a stream
-			// over http. An equivalent to a catch up subsription, would be to
-			// enumerate over the events in a stream and then to LongPoll when
-			// there are no more events to return.
+			// When there are no events returned from the request a NoMoreEventsError is
+			// returned. This typically happens when requesting events past the head of
+			// the stream.
+			// In this example we simply read from start of stream to the end and then
+			// exit. See the simulator example for how to poll at the head of the stream.
 			case *goes.NoMoreEventsError:
 				//Finished reading all the events.
 				return
@@ -122,29 +117,27 @@ func readEvents(client goes.Client, streamName string) {
 			}
 		} else {
 
-			// If there are no errors, the reader has retrieved an event
-			// the following code demonstrates how to deserialise the event data
-			// returned from the eventstore.
+			// If there are no errors, it means the reader has successfully retrieved an event.
+			// The following code demonstrates how to deserialise the event data and event meta
+			// data returned.
 
-			// the event data, event meta data and information about the
-			// event are available via the reader's EventResponse() method.
+			// The event data and metadata and other useful information about the event
+			// are available via the reader's EventResponse() method.
 
-			// One very important peice of data about the event is the event
+			// One very important peice of data available about the event is the event
 			// type. The event type is a string containing the name of the event
-			// type and is useful in more realistic scenarios for selecting
-			// the correct type to pass to the scan method for deserialization.
+			// type and is useful in more realistic scenarios for identifying which event type
+			// has been returned and so pass the correct event type to the scan method for
+			// deserialization.
 			// eventType := reader.EventResponse().Event.EventType
-			// In this simple example we only have one event type and so we do
-			// not use it here.
 
-			// Create an event to deserialise the event data into
+			// Create a new FooEvent to deserialise the event data into
 			fooEvent := FooEvent{}
 
-			// Create a map for the meta data
+			// Create a map to hold the event metadata
 			fooMeta := make(map[string]string)
 
-			// Call scan on the reader passing in pointers to the event and meta
-			// data targets
+			// Call scan on the reader passing in pointers to the event and meta data targets
 			reader.Scan(&fooEvent, &fooMeta)
 
 			// Check for any errors that have occured during deserialization
