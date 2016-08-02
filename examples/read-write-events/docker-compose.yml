@@ -1,8 +1,8 @@
 version: '2'
 services: 
 
-eventstore:
-    build: ./eventstore
-    ports:  
-      - "2113:2113"
-      - "1113:1113"
+    eventstore:
+        build: .
+        ports:  
+            - "2113:2113"
+            - "1113:1113"

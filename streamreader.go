@@ -227,7 +227,7 @@ func (s *streamReader) Scan(e interface{}, m interface{}) error {
 		}
 	}
 
-	if m != nil {
+	if m != nil && s.EventResponse().Event.MetaData != nil {
 		meta, ok := s.eventResponse.Event.MetaData.(*json.RawMessage)
 		if !ok {
 			return fmt.Errorf("Could not unmarshal the event. Event data is not of type *json.RawMessage")

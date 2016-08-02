@@ -10,11 +10,6 @@ import (
 	"time"
 )
 
-// EventFactory is the interface that an event factory should implement
-type EventFactory interface {
-	GetEvent(string) interface{}
-}
-
 // EventResponse encapsulates the response for an event reflecting the atom
 // response returned from the server which contains data in addition to the
 // actual event when requested as content type application/vnd.eventstore.atom+json

@@ -9,11 +9,11 @@ To run this example you should have an eventstore server running on http://local
 If you are a docker user you can set up an eventstore server using the included Docker Compose file.
 
 ```
-$ docker compose up -f examples/read-write-events/docker-compose.yml
+.../goes/examples/read-write-events$ docker-compose up
 ```
 Once the server is up simply **go run** the example.
 
 ```
-$ go run examples/read-write-events/main.go
+../goes/examples/read-write-events$ go run main.go
 ```
 

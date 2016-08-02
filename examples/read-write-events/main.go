@@ -10,11 +10,13 @@ import (
 	"github.com/jetbasrawi/goes"
 )
 
+var eventActivators map[string]func() (interface{}, interface{})
+
 // FooEvent is an example event type
 //
 // An event within your application will just be a plain go struct.
 // The event will be serialized and deserialised to JSON and all of
-// the standard golang JSON serialisation features apply. Here the
+// the standard golang JSON serialization features apply. Here the
 // struct does not use tags to specify a different name for the JSON
 // fields or wether a field is optional. The name of the field as it
 // is will be used.
@@ -22,6 +24,14 @@ type FooEvent struct {
 	FooField string
 	BarField string
 	BazField int
+}
+
+// BarEvent is an alternate event type to help demonstrate
+// using different types of event.
+type BarEvent struct {
+	Bar string
+	Foo string
+	Baz string
 }
 
 func main() {
@@ -37,6 +47,12 @@ func main() {
 
 	streamName := "foostream"
 
+	// Set up some delegates to instantiate events for deserialization
+	// of the events returned from the eventstore.
+	eventActivators = make(map[string]func() (interface{}, interface{}))
+	eventActivators["FooEvent"] = func() (interface{}, interface{}) { return &FooEvent{}, make(map[string]string) }
+	eventActivators["BarEvent"] = func() (interface{}, interface{}) { return &BarEvent{}, nil }
+
 	// Write some events to the eventstore
 	writeEvents(client, streamName)
 
@@ -46,6 +62,9 @@ func main() {
 }
 
 func readEvents(client goes.Client, streamName string) {
+
+	log.Printf("\nReading events from the eventstore\n")
+
 	// Create a new stream reader
 	reader := client.NewStreamReader(streamName)
 
@@ -125,34 +144,29 @@ func readEvents(client goes.Client, streamName string) {
 			// are available via the reader's EventResponse() method.
 
 			// One very important piece of data available about the event is the event
-			// type. The event type is a string containing the name of the event
-			// type and is useful in more realistic scenarios for identifying which event type
-			// has been returned and so pass the correct event type to the scan method for
-			// deserialization.
-			// eventType := reader.EventResponse().Event.EventType
+			// type.
 
-			// Create a new FooEvent to deserialise the event data into
-			fooEvent := FooEvent{}
-
-			// Create a map to hold the event metadata
-			fooMeta := make(map[string]string)
-
-			// Call scan on the reader passing in pointers to the event and meta data targets
-			err := reader.Scan(&fooEvent, &fooMeta)
-			// Check for any errors that have occurred during deserialization
-			if err != nil {
-				log.Fatal(reader.Err())
+			var event interface{}
+			var meta interface{}
+			if f, ok := eventActivators[reader.EventResponse().Event.EventType]; ok {
+				event, meta = f()
+				// Call scan on the reader passing in pointers to the event and meta data targets
+				err := reader.Scan(&event, &meta)
+				// Check for any errors that have occurred during deserialization
+				if err != nil {
+					log.Fatal(err)
+				}
+				log.Printf("\n Event %d returned %#v\n Meta returned %#v\n\n", reader.EventResponse().Event.EventNumber, event, meta)
+			} else {
+				log.Fatalf("Could not instantiate event of type %s", reader.EventResponse().Event.EventType)
 			}
-
-			log.Printf("\n Event %d returned %#v\n Meta returned %#v\n\n", reader.EventResponse().Event.EventNumber, fooEvent, fooMeta)
 		}
 	}
 }
 
 func writeEvents(client goes.Client, streamName string) {
-	// Create some events.
-	// Here we will create two events and their associated metadata demonstrating how
-	// to write events and event metadata to the eventstore
+	// Create two events and their associated metadata demonstrating how
+	// to write events and event metadata to the eventstore.
 
 	// Create an event of type FooEvent
 	event1 := &FooEvent{
@@ -172,18 +186,19 @@ func writeEvents(client goes.Client, streamName string) {
 	goesEvent1 := goes.ToEventData(goes.NewUUID(), "FooEvent", event1, event1Meta)
 
 	// Create another event of type foo event
-	event2 := &FooEvent{
-		FooField: "Mary had a little lamb",
-		BarField: "It's fleece was white as snow",
-		BazField: 1,
+	event2 := &BarEvent{
+		Foo: "Contrary to popular belief, Lorem Ipsum is not simply random text.",
+		Bar: "It has roots in a piece of classical Latin literature from 45 BC.",
+		Baz: "Making it over 2000 years old.",
 	}
 
 	// This time the eventID and EventType have been left blank.
 	// The eventID will be an automatically generated uuid.
-	// The eventType will be reflected from the type and will be "FooEvent"
+	// The eventType will be reflected from the type and will be "BarEvent"
 	goesEvent2 := goes.ToEventData("", "", event2, nil)
 
 	//Writing to the stream
+	log.Printf("\nWriting events to the eventstore\n")
 
 	// Create a new streamwriter passing in the name of the stream you want to write to.
 	// If the stream does not exist, it will be created when events are written to it.
@@ -198,6 +213,8 @@ func writeEvents(client goes.Client, streamName string) {
 		log.Fatal(err)
 	}
 
+	log.Println("Writing to eventstore with an expected version that should error.")
+
 	// Lets repeat this but using an expected version that will cause an error
 	// to demonstrate handling concurrency errors
 	// This should result in a goes.ConcurrencyError
@@ -207,6 +224,5 @@ func writeEvents(client goes.Client, streamName string) {
 		log.Printf("Received expected error. %#v\n", err)
 	}
 
-	log.Printf("Written events to the eventStore.")
-
+	log.Printf("Written 2 events to the eventStore.")
 }

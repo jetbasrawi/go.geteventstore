@@ -126,7 +126,7 @@ func (s *StreamReaderSuite) TestReturnsErrorIfThereIsNoNextEventToReturn(c *C) {
 	c.Assert(stream.EventResponse(), IsNil)
 }
 
-// Tests the deserialisation of events
+// Tests the deserialization of events
 func (s *StreamReaderSuite) TestScanEventData(c *C) {
 	streamName := "SomeStream"
 	ne := 1

@@ -174,7 +174,7 @@ func main() {
 			err := reader.Scan(&fooEvent, &fooMeta)
 			// Check for any errors that have occurred during deserialization
 			if err != nil {
-				log.Fatal(reader.Err())
+				log.Fatal(err)
 			}
 
 			log.Printf("\n Event %d returned %#v\n Meta returned %#v\n\n", reader.EventResponse().Event.EventNumber, fooEvent, fooMeta)

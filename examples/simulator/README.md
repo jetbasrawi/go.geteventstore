@@ -18,7 +18,7 @@ about how to set up and use the simulator.
 To run the example simply **go run** it.
 
 ```
-$ go run examples/simulator/main.go
+$ go run main.go
 ```
 
 
