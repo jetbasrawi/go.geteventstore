@@ -1,3 +1,4 @@
+// Package atom provides types for handling atom feeds from the eventstore.
 package atom
 
 import (

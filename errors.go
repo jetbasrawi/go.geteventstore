@@ -2,78 +2,79 @@ package goes
 
 import "fmt"
 
-type invalidVersionError int
+type errInvalidVersion int
 
-func (i invalidVersionError) Error() string {
+func (i errInvalidVersion) Error() string {
 	return fmt.Sprintf("%d is not a valid event number", i)
 }
 
-// NoMoreEventsError is returned when there are no events to return
+// ErrNoMoreEvents is returned when there are no events to return
 // from a request to a stream.
-type NoMoreEventsError struct{}
+type ErrNoMoreEvents struct{}
 
-func (e NoMoreEventsError) Error() string {
+func (e ErrNoMoreEvents) Error() string {
 	return "There are no more events to load."
 }
 
-// NotFoundError is returned when a stream is not found.
-type NotFoundError struct {
+// ErrNotFound is returned when a stream is not found.
+type ErrNotFound struct {
 	ErrorResponse *ErrorResponse
 }
 
-func (e NotFoundError) Error() string {
+func (e ErrNotFound) Error() string {
 	return "The stream does not exist."
 }
 
-// UnauthorizedError is returned when a request to the eventstore is
+// ErrUnauthorized is returned when a request to the eventstore is
 // not authorized
-type UnauthorizedError struct {
+type ErrUnauthorized struct {
 	ErrorResponse *ErrorResponse
 }
 
-func (e UnauthorizedError) Error() string {
+func (e ErrUnauthorized) Error() string {
 	return "You are not authorised to access the stream or the stream does not exist."
 }
 
-// TemporarilyUnavailableError is returned when the server returns ServiceUnavailable.
+// ErrTemporarilyUnavailable is returned when the server returns ServiceUnavailable.
 //
 // This error may be returned if a request is made to the server during startup. When
 // the server starts up initially and the client is completely unable to connect to the
 // server a *url.Error will be returned. Once the server is up but not ready to serve
 // requests a ServiceUnavailable error will be returned for a brief period.
-type TemporarilyUnavailableError struct {
+type ErrTemporarilyUnavailable struct {
 	ErrorResponse *ErrorResponse
 }
 
-func (e TemporarilyUnavailableError) Error() string {
+func (e ErrTemporarilyUnavailable) Error() string {
 	return "Server Is Not Ready"
 }
 
-// UnexpectedError is returned when a request to the eventstore returns an error that
+// ErrUnexpected is returned when a request to the eventstore returns an error that
 // is not explicitly represented by a goes Error type such as UnauthorisedError or
-// NotFoundError
-type UnexpectedError struct {
+// ErrNotFound
+type ErrUnexpected struct {
 	ErrorResponse *ErrorResponse
 }
 
-func (e UnexpectedError) Error() string {
+func (e ErrUnexpected) Error() string {
 	return "An unexpected error occurred."
 }
 
-// BadRequestError is returned when the server returns a bad request error
-type BadRequestError struct {
+// ErrBadRequest is returned when the server returns a bad request error
+type ErrBadRequest struct {
 	ErrorResponse *ErrorResponse
 }
 
-func (e BadRequestError) Error() string {
+func (e ErrBadRequest) Error() string {
 	return "Bad request."
 }
 
-// ConcurrencyError is returned when the server returns a bad request error
-type ConcurrencyError struct {
+// ErrConcurrencyViolation is returned when the expected version does not match
+// the stream version when writing to an event stream.
+type ErrConcurrencyViolation struct {
 	ErrorResponse *ErrorResponse
 }
 
-func (e ConcurrencyError) Error() string {
+func (e ErrConcurrencyViolation) Error() string {
 	return "Concurrency Error."
 }

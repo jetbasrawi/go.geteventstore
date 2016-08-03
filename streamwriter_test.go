@@ -29,7 +29,7 @@ func (s *StreamWriterSuite) TearDownTest(c *C) {
 func (s *StreamWriterSuite) TestAppendEventsSingle(c *C) {
 	data := &MyDataType{Field1: 445, Field2: "Some string"}
 	et := "SomeEventType"
-	ev := ToEventData("", et, data, nil)
+	ev := NewEvent("", et, data, nil)
 	streamName := "Some-Stream"
 	url := fmt.Sprintf("/streams/%s", streamName)
 	mux.HandleFunc(url, func(w http.ResponseWriter, r *http.Request) {
@@ -59,8 +59,8 @@ func (s *StreamWriterSuite) TestAppendEventsMultiple(c *C) {
 	et := "SomeEventType"
 	d1 := &MyDataType{Field1: 445, Field2: "Some string"}
 	d2 := &MyDataType{Field1: 446, Field2: "Some other string"}
-	ev1 := ToEventData("", et, d1, nil)
-	ev2 := ToEventData("", et, d2, nil)
+	ev1 := NewEvent("", et, d1, nil)
+	ev2 := NewEvent("", et, d2, nil)
 
 	stream := "Some-Stream"
 	url := fmt.Sprintf("/streams/%s", stream)
@@ -85,10 +85,10 @@ func (s *StreamWriterSuite) TestAppendEventsMultiple(c *C) {
 	c.Assert(err, IsNil)
 }
 
-func (s *StreamWriterSuite) TestAppendEventsWithConcurrencyError(c *C) {
+func (s *StreamWriterSuite) TestAppendEventsWithErrConcurrencyViolation(c *C) {
 	data := &MyDataType{Field1: 445, Field2: "Some string"}
 	et := "SomeEventType"
-	ev := ToEventData("", et, data, nil)
+	ev := NewEvent("", et, data, nil)
 
 	stream := "Some-Stream"
 	url := fmt.Sprintf("/streams/%s", stream)
@@ -107,12 +107,10 @@ func (s *StreamWriterSuite) TestAppendEventsWithConcurrencyError(c *C) {
 
 	})
 
-	//client.client.Transport = newMockTransport()
 	streamWriter := eventStoreClient.NewStreamWriter(stream)
 	err := streamWriter.Append(&expectedVersion, ev)
-	//client.client.Transport = http.DefaultTransport
 	c.Assert(err, NotNil)
-	c.Assert(typeOf(err), DeepEquals, "ConcurrencyError")
+	c.Assert(typeOf(err), DeepEquals, "ErrConcurrencyViolation")
 }
 
 func (s *StreamWriterSuite) TestAppendStreamMetadata(c *C) {
@@ -172,10 +170,10 @@ func (s *StreamWriterSuite) TestAppendStreamMetadataReturnsUnauthorisedWhenGetti
 	err := writer.WriteMetaData(stream, &want)
 
 	c.Assert(err, NotNil)
-	if e, ok := err.(*UnauthorizedError); ok {
+	if e, ok := err.(*ErrUnauthorized); ok {
 		c.Assert(e.ErrorResponse, NotNil)
 	} else {
-		c.Error("Error returned is not of type *UnauthorizedError")
+		c.Error("Error returned is not of type *ErrUnauthorized")
 	}
 }
 
@@ -194,14 +192,14 @@ func (s *StreamWriterSuite) TestAppendStreamMetadataReturnsTemporarilyUnavailabl
 	err := writer.WriteMetaData(stream, &want)
 
 	c.Assert(err, NotNil)
-	if e, ok := err.(*TemporarilyUnavailableError); ok {
+	if e, ok := err.(*ErrTemporarilyUnavailable); ok {
 		c.Assert(e.ErrorResponse, NotNil)
 	} else {
-		c.Error("Error returned is not of type *TemporarilyUnavailableError")
+		c.Error("Error returned is not of type *ErrTemporarilyUnavailable")
 	}
 }
 
-func (s *StreamWriterSuite) TestAppendStreamMetadataReturnsUnexpectedErrorWhenGettingMetaURL(c *C) {
+func (s *StreamWriterSuite) TestAppendStreamMetadataReturnsErrUnexpectedWhenGettingMetaURL(c *C) {
 	stream := "SomeStream"
 	path := fmt.Sprintf("/streams/%s/0/forward/1", stream)
 	mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
@@ -216,14 +214,14 @@ func (s *StreamWriterSuite) TestAppendStreamMetadataReturnsUnexpectedErrorWhenGe
 	err := writer.WriteMetaData(stream, &want)
 
 	c.Assert(err, NotNil)
-	if e, ok := err.(*UnexpectedError); ok {
+	if e, ok := err.(*ErrUnexpected); ok {
 		c.Assert(e.ErrorResponse, NotNil)
 	} else {
-		c.Error("Error returned is not of type *UnexpectedError")
+		c.Error("Error returned is not of type *ErrUnexpected")
 	}
 }
 
-func (s *StreamWriterSuite) TestAppendStreamMetadataReturnsUnexpectedErrorWhenWritingMeta(c *C) {
+func (s *StreamWriterSuite) TestAppendStreamMetadataReturnsErrUnexpectedWhenWritingMeta(c *C) {
 	eventType := "MetaData"
 	stream := "SomeStream"
 
@@ -253,14 +251,14 @@ func (s *StreamWriterSuite) TestAppendStreamMetadataReturnsUnexpectedErrorWhenWr
 	err := writer.WriteMetaData(stream, &want)
 
 	c.Assert(err, NotNil)
-	if e, ok := err.(*UnexpectedError); ok {
+	if e, ok := err.(*ErrUnexpected); ok {
 		c.Assert(e.ErrorResponse, NotNil)
 	} else {
-		c.Error("Error returned is not of type *UnexpectedError")
+		c.Error("Error returned is not of type *ErrUnexpected")
 	}
 }
 
-func (s *StreamWriterSuite) TestAppendStreamMetadataReturnsUnauthorizedErrorWhenWritingMeta(c *C) {
+func (s *StreamWriterSuite) TestAppendStreamMetadataReturnsErrUnauthorizedWhenWritingMeta(c *C) {
 	eventType := "MetaData"
 	stream := "SomeStream"
 
@@ -290,14 +288,14 @@ func (s *StreamWriterSuite) TestAppendStreamMetadataReturnsUnauthorizedErrorWhen
 	err := writer.WriteMetaData(stream, &want)
 
 	c.Assert(err, NotNil)
-	if e, ok := err.(*UnauthorizedError); ok {
+	if e, ok := err.(*ErrUnauthorized); ok {
 		c.Assert(e.ErrorResponse, NotNil)
 	} else {
-		c.Error("Error returned is not of type *UnauthorizedError")
+		c.Error("Error returned is not of type *ErrUnauthorized")
 	}
 }
 
-func (s *StreamWriterSuite) TestAppendStreamMetadataReturnsTemporarilyUnavailableErrorWhenWritingMeta(c *C) {
+func (s *StreamWriterSuite) TestAppendStreamMetadataReturnsErrTemporarilyUnavailableWhenWritingMeta(c *C) {
 	eventType := "MetaData"
 	stream := "SomeStream"
 
@@ -327,9 +325,9 @@ func (s *StreamWriterSuite) TestAppendStreamMetadataReturnsTemporarilyUnavailabl
 	err := writer.WriteMetaData(stream, &want)
 
 	c.Assert(err, NotNil)
-	if e, ok := err.(*TemporarilyUnavailableError); ok {
+	if e, ok := err.(*ErrTemporarilyUnavailable); ok {
 		c.Assert(e.ErrorResponse, NotNil)
 	} else {
-		c.Error("Error returned is not of type *TemporarilyUnavailableError")
+		c.Error("Error returned is not of type *ErrTemporarilyUnavailable")
 	}
 }

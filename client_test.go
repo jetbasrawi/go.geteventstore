@@ -177,7 +177,7 @@ func (s *ClientSuite) TestErrorResponseContainsCopyOfTheOriginalRequest(c *C) {
 
 	_, err := eventStoreClient.do(req, nil)
 
-	if e, ok := err.(*BadRequestError); ok {
+	if e, ok := err.(*ErrBadRequest); ok {
 		c.Assert(e.ErrorResponse.Request, DeepEquals, req)
 	} else {
 		c.FailNow()
@@ -194,7 +194,7 @@ func (s *ClientSuite) TestErrorResponseContainsStatusCodeAndMessage(c *C) {
 
 	_, err := eventStoreClient.do(req, nil)
 
-	if e, ok := err.(*BadRequestError); ok {
+	if e, ok := err.(*ErrBadRequest); ok {
 		c.Assert(e.ErrorResponse.StatusCode, Equals, http.StatusBadRequest)
 		c.Assert(e.ErrorResponse.Status, Equals, "400 Bad Request")
 	} else {

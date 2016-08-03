@@ -10,19 +10,19 @@ the client in more detail, heavily commented example code can be found in the ex
 
 ###Get the package
 ```
-    $ go get github.com/jetbasrawi/go.geteventstore/goes"
+    $ go get github.com/jetbasrawi/go.geteventstore"
 ```
 
 ###Import the package
 ```go 
-    import "github.com/jetbasrawi/go.geteventstore/goes"
+    import "github.com/jetbasrawi/go.geteventstore"
 ```
 
 
 ###Create a new client
 
 ```go
-    client, err := goes.NewClient(nil, "http://localhost:2113")
+    client, err := goes.NewClient(nil, "http://youreventstore:2113")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -61,7 +61,7 @@ Writing events and event metadata are supported via the StreamWriter.
 	myEventMeta["Foo"] = "consectetur adipiscing elit"
 
     // Wrap your event and event metadata in a goes.Event
-	myGoesEvent := goes.ToEventData(goes.NewUUID(), "FooEvent", myEvent, myEventMeta)
+	myGoesEvent := goes.NewEvent(goes.NewUUID(), "FooEvent", myEvent, myEventMeta)
 
     // Write the event to the stream, here we pass nil as the expectedVersion as we 
     // are not wanting to flag concurrency errors
@@ -71,7 +71,6 @@ Writing events and event metadata are supported via the StreamWriter.
     }
 
 ```
-
 
 ###Read Events
 
@@ -84,7 +83,7 @@ An example of how to read all the events in a stream and then exit can be found 
 read and write events example.
 
 An example of how to read up to the head of the stream and then continue to listen for new 
-events can be found in the simulator example.
+events can be found in the longpoll example.
 
 ```go 
 
@@ -112,5 +111,12 @@ events can be found in the simulator example.
     }
 
 ```
+
+###Direct use of the client
+
+The StreamReader and StreamWriter types are the easiest way to read and write events. If you would like to implement
+some other logic around reading events, some methods are available on the Client type.
+
+
 
 

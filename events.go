@@ -7,7 +7,10 @@ package goes
 
 import (
 	"encoding/json"
+	"reflect"
 	"time"
+
+	"github.com/jetbasrawi/go.geteventstore/internal/uuid"
 )
 
 // EventResponse encapsulates the response for an event reflecting the atom
@@ -15,7 +18,7 @@ import (
 // actual event when requested as content type application/vnd.eventstore.atom+json
 //
 // For more information on the server response see:
-// http://docs.geteventstore.com/http-api/3.6.0/reading-streams/
+// http://docs.geteventstore.com/http-api/3.7.0/reading-streams/
 type EventResponse struct {
 	Title   string
 	ID      string
@@ -57,7 +60,7 @@ func (e *eventAtomResponse) PrettyPrint() string {
 
 // Event encapsulates the data of an eventstore event.
 //
-//EventStreamID is ..TODO
+// EventStreamID is the id returned in the event atom response.
 // EventNumber represents the stream version for this event.
 // EventType describes the event type.
 // EventID is the guid of the event.
@@ -92,7 +95,45 @@ type Link struct {
 // TimeStr is a type used to format feed dates.
 type TimeStr string
 
-// Time returns a TimeStr version of the time.Time argument t
+// Time returns a TimeStr version of the time.Time argument t.
 func Time(t time.Time) TimeStr {
 	return TimeStr(t.Format("2006-01-02T15:04:05-07:00"))
+}
+
+// ToEventData creates a new event object.
+//
+// If an empty eventId is provided a new uuid will be generated automatically
+// and retured in the event.
+// If an empty eventType is provided the eventType will be set to the
+// name of the type provided.
+// data and meta can be nil.
+func NewEvent(eventID, eventType string, data interface{}, meta interface{}) *Event {
+	e := &Event{}
+
+	e.EventID = eventID
+	if eventID == "" {
+		e.EventID = NewUUID()
+	}
+
+	e.EventType = eventType
+	if eventType == "" {
+		e.EventType = typeOf(data)
+	}
+
+	e.Data = data
+	e.MetaData = meta
+	return e
+}
+
+// NewUUID returns a new V4 uuid as a string.
+func NewUUID() string {
+	return uuid.NewV4().String()
+}
+
+// typeOf is a helper to get the names of types.
+func typeOf(i interface{}) string {
+	if i == nil {
+		return ""
+	}
+	return reflect.TypeOf(i).Elem().Name()
 }

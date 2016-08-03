@@ -1,25 +1,12 @@
-#Using the atom feed simulator
+#Using LongPoll to listen for new events
 
-The atom feed simulator is a http handler that can be used by the net/http/httptest
-server to simulate the atom feeds served by the eventstore.
+A common use case is to read events to the head of an event stream and then listen for new 
+events.
 
-The reads a stream from version 0 and when it reaches the head of the stream it begins to 
-LongPoll the stream, listening for new events. This is similar to a catch up subscription.
+This example demonstrates how to do this.
 
-This example demonstrates
-    - Setting up the simulator
-    - Reading events from a stream
-    - Handling errors
-    - Polling
-
-The code is heavily commented so have a look at the example code for more details 
-about how to set up and use the simulator.
-
-To run the example simply **go run** it.
+Once the server is up simply **go run** the examples.
 
 ```
-$ go run main.go
+../goes/examples/longpoll$ go run main.go
 ```
-
-
-

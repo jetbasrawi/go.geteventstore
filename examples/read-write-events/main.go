@@ -104,30 +104,30 @@ func readEvents(client *goes.Client, streamName string) {
 			// some time.
 			// When the eventstore comes online there is a short period where
 			// it responds with a StatusServiceUnavailable. The goes client
-			// returns a TemporarilyUnavailableError and here we respond to this
+			// returns a ErrTemporarilyUnavailable and here we respond to this
 			// with a retry after some duration.
-			case *url.Error, *goes.TemporarilyUnavailableError:
+			case *url.Error, *goes.ErrTemporarilyUnavailable:
 				log.Println("The server is not ready. Will retry after 30 seconds.")
 				<-time.After(time.Duration(30) * time.Second)
 
 			// If a stream is not found a StreamDoesNotExistError is returned.
 			// In this example we will retry after some duration expecting that
 			// the stream will be created eventually.
-			case *goes.NotFoundError:
+			case *goes.ErrNotFound:
 				<-time.After(time.Duration(10) * time.Second)
 
 			// If the request is not authorised to read from the stream an
-			// UnauthorizedError will be returned. For this example we assume
+			// ErrUnauthorized will be returned. For this example we assume
 			// that this is not recoverable and we exit.
-			case *goes.UnauthorizedError:
+			case *goes.ErrUnauthorized:
 				log.Fatal(err)
 
-			// When there are no events returned from the request a NoMoreEventsError is
+			// When there are no events returned from the request a ErrNoMoreEvents is
 			// returned. This typically happens when requesting events past the head of
 			// the stream.
 			// In this example we simply read from start of stream to the end and then
 			// exit. See the simulator example for how to poll at the head of the stream.
-			case *goes.NoMoreEventsError:
+			case *goes.ErrNoMoreEvents:
 				//Finished reading all the events.
 				return
 
@@ -184,7 +184,7 @@ func writeEvents(client *goes.Client, streamName string) {
 	// Create a goes.Event which contains the event data and metadata.
 	//
 	// Here the eventID and EventType have been specified explicitly.
-	goesEvent1 := goes.ToEventData(goes.NewUUID(), "FooEvent", event1, event1Meta)
+	goesEvent1 := goes.NewEvent(goes.NewUUID(), "FooEvent", event1, event1Meta)
 
 	// Create another event of type foo event
 	event2 := &BarEvent{
@@ -196,7 +196,7 @@ func writeEvents(client *goes.Client, streamName string) {
 	// This time the eventID and EventType have been left blank.
 	// The eventID will be an automatically generated uuid.
 	// The eventType will be reflected from the type and will be "BarEvent"
-	goesEvent2 := goes.ToEventData("", "", event2, nil)
+	goesEvent2 := goes.NewEvent("", "", event2, nil)
 
 	//Writing to the stream
 	log.Printf("\nWriting events to the eventstore\n")
@@ -218,7 +218,7 @@ func writeEvents(client *goes.Client, streamName string) {
 
 	// Lets repeat this but using an expected version that will cause an error
 	// to demonstrate handling concurrency errors
-	// This should result in a goes.ConcurrencyError
+	// This should result in a goes.ErrConcurrencyViolation
 	v := 0
 	err = writer.Append(&v, goesEvent1)
 	if err != nil {

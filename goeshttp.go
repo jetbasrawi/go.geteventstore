@@ -13,22 +13,3 @@
 // The package also provides StreamReader and StreamWriter types which
 // provide methods for reading and writing events and metadata.
 package goes
-
-import (
-	"reflect"
-
-	"github.com/jetbasrawi/go.geteventstore/internal/uuid"
-)
-
-// typeOf is a helper to get the names of types.
-func typeOf(i interface{}) string {
-	if i == nil {
-		return ""
-	}
-	return reflect.TypeOf(i).Elem().Name()
-}
-
-// NewUUID returns a new V4 uuid as a string.
-func NewUUID() string {
-	return uuid.NewV4().String()
-}

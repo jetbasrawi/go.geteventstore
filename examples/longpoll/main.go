@@ -67,22 +67,22 @@ func main() {
 		if reader.Err() != nil {
 			switch err := reader.Err().(type) {
 
-			case *url.Error, *goes.TemporarilyUnavailableError:
+			case *url.Error, *goes.ErrTemporarilyUnavailable:
 				log.Println("The server is not ready. Will retry after 30 seconds.")
 				<-time.After(time.Duration(30) * time.Second)
 
-			case *goes.NotFoundError:
+			case *goes.ErrNotFound:
 				<-time.After(time.Duration(10) * time.Second)
 
-			case *goes.UnauthorizedError:
+			case *goes.ErrUnauthorized:
 				log.Fatal(err)
 
-			// When there are no events returned from the request a NoMoreEventsError is
+			// When there are no events returned from the request a ErrNoMoreEvents is
 			// returned. This typically happens when requesting events past the head of
 			// the stream.
 			// In this example we will set the reader to LongPoll the stream listening for
 			// new events.
-			case *goes.NoMoreEventsError:
+			case *goes.ErrNoMoreEvents:
 				log.Println("No more events. Will poll head of stream.")
 				reader.LongPoll(15)
 

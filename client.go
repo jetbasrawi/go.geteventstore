@@ -70,7 +70,7 @@ type basicAuthCredentials struct {
 // 	DeleteHeader(key string)
 // }
 
-// Client is a database handle for an eventstore server.
+// Client is a handle for an eventstore server.
 //
 // The client is used to store connection details such as server URL,
 // basic authentication credentials and headers.
@@ -80,7 +80,7 @@ type basicAuthCredentials struct {
 // In general, the StreamReader and StreamWriter should be used to
 // interact with the eventstore. These methods further abstract methods
 // on the client, however you can also directly use methods on the client
-// to interact with the eventstore if necessary.
+// to interact with the eventstore if you want to create some custom behaviour.
 type Client struct {
 	client      *http.Client
 	baseURL     *url.URL
@@ -90,8 +90,12 @@ type Client struct {
 
 // NewClient returns a new client.
 //
-// httpClient will usually be nil and will use the http.DefaultClient.
-// serverURL is the url to your eventstore server.
+// httpClient will usually be nil and the client will use the http.DefaultClient. Should
+// you want to implement behaviours at the transport level you can provide your own
+// *http.Client
+//
+// serverURL is the full URL to your eventstore server including protocol scheme and
+// port number.
 func NewClient(httpClient *http.Client, serverURL string) (*Client, error) {
 	if httpClient == nil {
 		httpClient = http.DefaultClient
@@ -197,7 +201,7 @@ func (c *Client) GetEvent(url string) (*EventResponse, *Response, error) {
 	return &e, resp, nil
 }
 
-// ReadFeed reads a streams atom feed page returns an *atom.Feed.
+// ReadFeed reads the atom feed for a stream and returns an *atom.Feed.
 //
 // The feed object returned may be nil in case of an error.
 // The *Response may also be nil if the error occurred before the http request.
@@ -226,6 +230,41 @@ func (c *Client) ReadFeed(url string) (*atom.Feed, *Response, error) {
 	}
 
 	return feed, resp, nil
+}
+
+// GetFeedURL constructs the correct url format for the stream using the version
+// and take parameters.
+//
+// If version, take and direction are all nil or empty, the url returned will be
+// to read from the head of the stream backward
+func GetFeedURL(stream, direction string, version int, pageSize int) (string, error) {
+
+	//TODO: Validate stream argumemt to ensure that it contains only url safe characters
+
+	ps := pageSize
+
+	dir := ""
+	switch direction {
+	case "":
+		if version == 0 {
+			dir = "forward"
+		} else {
+			dir = "backward"
+		}
+
+	case "forward", "backward":
+		dir = direction
+	default:
+		return "", fmt.Errorf("Invalid Direction %s\n", direction)
+	}
+
+	ver := "head"
+	if version < 0 {
+		return "", errInvalidVersion(version)
+	}
+	ver = strconv.Itoa(version)
+
+	return fmt.Sprintf("/streams/%s/%s/%s/%d", stream, ver, dir, ps), nil
 }
 
 // GetMetadataURL gets the url for the stream metadata.
@@ -378,51 +417,16 @@ func getError(r *http.Response, req *http.Request) error {
 
 	switch r.StatusCode {
 	case http.StatusBadRequest:
-		return &BadRequestError{ErrorResponse: errorResponse}
+		return &ErrBadRequest{ErrorResponse: errorResponse}
 	case http.StatusUnauthorized:
-		return &UnauthorizedError{ErrorResponse: errorResponse}
+		return &ErrUnauthorized{ErrorResponse: errorResponse}
 	case http.StatusServiceUnavailable:
-		return &TemporarilyUnavailableError{ErrorResponse: errorResponse}
+		return &ErrTemporarilyUnavailable{ErrorResponse: errorResponse}
 	case http.StatusNotFound:
-		return &NotFoundError{ErrorResponse: errorResponse}
+		return &ErrNotFound{ErrorResponse: errorResponse}
 	default:
-		return &UnexpectedError{ErrorResponse: errorResponse}
+		return &ErrUnexpected{ErrorResponse: errorResponse}
 	}
-}
-
-// getFeedURL constructs the correct url format for the stream using the version
-// and take parameters.
-//
-// If version, take and direction are all nil or empty, the url returned will be
-// to read from the head of the stream backward
-func getFeedURL(stream, direction string, version int, pageSize int) (string, error) {
-
-	//TODO: Validate stream argumemt to ensure that it contains only url safe characters
-
-	ps := pageSize
-
-	dir := ""
-	switch direction {
-	case "":
-		if version == 0 {
-			dir = "forward"
-		} else {
-			dir = "backward"
-		}
-
-	case "forward", "backward":
-		dir = direction
-	default:
-		return "", fmt.Errorf("Invalid Direction %s\n", direction)
-	}
-
-	ver := "head"
-	if version < 0 {
-		return "", invalidVersionError(version)
-	}
-	ver = strconv.Itoa(version)
-
-	return fmt.Sprintf("/streams/%s/%s/%s/%d", stream, ver, dir, ps), nil
 }
 
 // unmarshalFeed decodes the io.Reader taken from the http response body and

@@ -263,7 +263,7 @@ func (s *GoesSuite) TestParseURLInvalidVersion(c *C) {
 
 	_, err := parseURL(url)
 
-	c.Assert(err, FitsTypeOf, invalidVersionError(version))
+	c.Assert(err, FitsTypeOf, errInvalidVersion(version))
 }
 
 func (s *GoesSuite) TestParseURLBase(c *C) {
@@ -609,7 +609,7 @@ func (s *GoesSuite) TestTrickleFeed(c *C) {
 			c.Assert(reader.Err(), Equals, nil)
 			c.Assert(reader.EventResponse, NotNil)
 		} else if count == 5 {
-			c.Assert(typeOf(reader.Err()), Equals, "NoMoreEventsError")
+			c.Assert(typeOf(reader.Err()), Equals, "ErrNoMoreEvents")
 			reader.LongPoll(1)
 		} else if count > 5 && count < 10 {
 			c.Assert(reader.Err(), Equals, nil)
@@ -703,7 +703,7 @@ func (h *AtomFeedSimulator) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		f, err := CreateTestFeed(h.Events[:index], reqURL.String())
 		if err != nil {
-			if serr, ok := err.(invalidVersionError); ok {
+			if serr, ok := err.(errInvalidVersion); ok {
 				http.Error(w, serr.Error(), http.StatusBadRequest)
 			} else {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -731,7 +731,7 @@ func (h *AtomFeedSimulator) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			f, err = CreateTestFeed(h.Events[:index], reqURL.String())
 			h.Unlock()
 			if err != nil {
-				if serr, ok := err.(invalidVersionError); ok {
+				if serr, ok := err.(errInvalidVersion); ok {
 					http.Error(w, serr.Error(), http.StatusBadRequest)
 				} else {
 					http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -1090,7 +1090,7 @@ func parseURL(u string) (*esRequest, error) {
 		i, err := strconv.ParseInt(split[2], 0, 0)
 		if err == nil {
 			if i < 0 {
-				return nil, invalidVersionError(i)
+				return nil, errInvalidVersion(i)
 			}
 			r.Version = int(i)
 		}

@@ -73,7 +73,7 @@ func (s *StreamReaderSuite) TestNextReturnsErrorIfStreamDoesNotExist(c *C) {
 	stream := eventStoreClient.NewStreamReader("Something")
 	ok := stream.Next()
 	c.Assert(ok, Equals, true)
-	c.Assert(typeOf(stream.Err()), DeepEquals, "NotFoundError")
+	c.Assert(typeOf(stream.Err()), DeepEquals, "ErrNotFound")
 }
 
 // Tests that the stream returns appropriate error when the request results in
@@ -87,7 +87,7 @@ func (s *StreamReaderSuite) TestNextErrorsIfNotAuthorisedToAccessStream(c *C) {
 	stream := eventStoreClient.NewStreamReader("Something")
 	ok := stream.Next()
 	c.Assert(ok, Equals, true)
-	c.Assert(typeOf(stream.Err()), DeepEquals, "UnauthorizedError")
+	c.Assert(typeOf(stream.Err()), DeepEquals, "ErrUnauthorized")
 }
 
 // Testing the case where next has reached the end of the stream and there are
@@ -116,7 +116,7 @@ func (s *StreamReaderSuite) TestReturnsErrorIfThereIsNoNextEventToReturn(c *C) {
 	ne := 1
 	es := CreateTestEvents(ne, streamName, server.URL, "FooEvent")
 	setupSimulator(es, nil)
-	want := &NoMoreEventsError{}
+	want := &ErrNoMoreEvents{}
 
 	stream := eventStoreClient.NewStreamReader(streamName)
 	_ = stream.Next()
@@ -198,7 +198,7 @@ func (s *StreamReaderSuite) TestFeedWithFewerEntriesThanThePageSize(c *C) {
 	count := 0
 	for stream.Next() {
 		switch err := stream.Err().(type) {
-		case *NoMoreEventsError:
+		case *ErrNoMoreEvents:
 			c.Assert(err, NotNil)
 			c.Assert(count, Equals, ne)
 			return
@@ -260,40 +260,40 @@ func (s *StreamReaderSuite) TestGetMetaData(c *C) {
 	c.Assert(got.PrettyPrint(), Equals, want.PrettyPrint())
 }
 
-func (s *StreamReaderSuite) TestGetMetaDataReturnsUnauthorizedErrorWhenGettingMetaURL(c *C) {
+func (s *StreamReaderSuite) TestGetMetaDataReturnsErrUnauthorizedWhenGettingMetaURL(c *C) {
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
 		fmt.Fprint(w, "{}")
 	})
 	reader := eventStoreClient.NewStreamReader("SomeStream")
 	m, err := reader.MetaData()
-	c.Assert(typeOf(err), Equals, "UnauthorizedError")
+	c.Assert(typeOf(err), Equals, "ErrUnauthorized")
 	c.Assert(m, IsNil)
 }
 
-func (s *StreamReaderSuite) TestGetMetaDataReturnsNotFoundErrorWhenGettingMetaURL(c *C) {
+func (s *StreamReaderSuite) TestGetMetaDataReturnsErrNotFoundWhenGettingMetaURL(c *C) {
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 		fmt.Fprint(w, "{}")
 	})
 	reader := eventStoreClient.NewStreamReader("SomeStream")
 	m, err := reader.MetaData()
-	c.Assert(typeOf(err), Equals, "NotFoundError")
+	c.Assert(typeOf(err), Equals, "ErrNotFound")
 	c.Assert(m, IsNil)
 }
 
-func (s *StreamReaderSuite) TestGetMetaDataReturnsTemporarilyUnavailableErrorWhenGettingMetaURL(c *C) {
+func (s *StreamReaderSuite) TestGetMetaDataReturnsErrTemporarilyUnavailableWhenGettingMetaURL(c *C) {
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusServiceUnavailable)
 		fmt.Fprint(w, "{}")
 	})
 	reader := eventStoreClient.NewStreamReader("SomeStream")
 	m, err := reader.MetaData()
-	c.Assert(typeOf(err), Equals, "TemporarilyUnavailableError")
+	c.Assert(typeOf(err), Equals, "ErrTemporarilyUnavailable")
 	c.Assert(m, IsNil)
 }
 
-func (s *StreamReaderSuite) TestGetMetaDataReturnsUnauthorizedErrorWhenGettingEvent(c *C) {
+func (s *StreamReaderSuite) TestGetMetaDataReturnsErrUnauthorizedWhenGettingEvent(c *C) {
 	stream := "SomeStream"
 	path := fmt.Sprintf("/streams/%s", stream)
 	feedURL := fmt.Sprintf("%s%s", server.URL, path)
@@ -310,11 +310,11 @@ func (s *StreamReaderSuite) TestGetMetaDataReturnsUnauthorizedErrorWhenGettingEv
 	})
 	reader := eventStoreClient.NewStreamReader("SomeStream")
 	m, err := reader.MetaData()
-	c.Assert(typeOf(err), Equals, "UnauthorizedError")
+	c.Assert(typeOf(err), Equals, "ErrUnauthorized")
 	c.Assert(m, IsNil)
 }
 
-func (s *StreamReaderSuite) TestGetMetaDataReturnsNotFoundErrorWhenGettingEvent(c *C) {
+func (s *StreamReaderSuite) TestGetMetaDataReturnsErrNotFoundWhenGettingEvent(c *C) {
 	stream := "SomeStream"
 	path := fmt.Sprintf("/streams/%s", stream)
 	feedURL := fmt.Sprintf("%s%s", server.URL, path)
@@ -331,11 +331,11 @@ func (s *StreamReaderSuite) TestGetMetaDataReturnsNotFoundErrorWhenGettingEvent(
 	})
 	reader := eventStoreClient.NewStreamReader("SomeStream")
 	m, err := reader.MetaData()
-	c.Assert(typeOf(err), Equals, "NotFoundError")
+	c.Assert(typeOf(err), Equals, "ErrNotFound")
 	c.Assert(m, IsNil)
 }
 
-func (s *StreamReaderSuite) TestGetMetaDataReturnsTemporarilyUnavailableErrorWhenGettingEvent(c *C) {
+func (s *StreamReaderSuite) TestGetMetaDataReturnsErrTemporarilyUnavailableWhenGettingEvent(c *C) {
 	stream := "SomeStream"
 	path := fmt.Sprintf("/streams/%s", stream)
 	feedURL := fmt.Sprintf("%s%s", server.URL, path)
@@ -352,6 +352,6 @@ func (s *StreamReaderSuite) TestGetMetaDataReturnsTemporarilyUnavailableErrorWhe
 	})
 	reader := eventStoreClient.NewStreamReader("SomeStream")
 	m, err := reader.MetaData()
-	c.Assert(typeOf(err), Equals, "TemporarilyUnavailableError")
+	c.Assert(typeOf(err), Equals, "ErrTemporarilyUnavailable")
 	c.Assert(m, IsNil)
 }

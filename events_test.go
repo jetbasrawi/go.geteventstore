@@ -39,7 +39,7 @@ func (s *EventSuite) TestToEventData(c *C) {
 	meta := &MyMetaDataType{MetaField1: 1010, MetaField2: "Some meta string"}
 	want := &Event{EventID: uuid, EventType: eventType, Data: data, MetaData: meta}
 
-	got := ToEventData(uuid, eventType, data, meta)
+	got := NewEvent(uuid, eventType, data, meta)
 
 	c.Assert(got, DeepEquals, want)
 }
@@ -49,7 +49,7 @@ func (s *EventSuite) TestToEventDataCreatesEventIDIfNotProvided(c *C) {
 	data := &MyDataType{Field1: 555, Field2: "Some string"}
 	meta := &MyMetaDataType{MetaField1: 1010, MetaField2: "Some meta string"}
 
-	got := ToEventData("", eventType, data, meta)
+	got := NewEvent("", eventType, data, meta)
 
 	c.Assert(got.EventID, Not(Equals), "")
 }
@@ -59,7 +59,7 @@ func (s *EventSuite) TestToEventDataUsesTypeNameAsEventTypeIfNotProvided(c *C) {
 	data := &MyDataType{Field1: 555, Field2: "Some string"}
 	meta := &MyMetaDataType{MetaField1: 1010, MetaField2: "Some meta string"}
 
-	got := ToEventData(uuid, "", data, meta)
+	got := NewEvent(uuid, "", data, meta)
 
 	c.Assert(got.EventType, DeepEquals, reflect.TypeOf(data).Elem().Name())
 }
