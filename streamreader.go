@@ -50,7 +50,7 @@ func (s *StreamReader) EventResponse() *EventResponse {
 // enumerator over a collection of results. Individual events are retrieved
 // on each call to Next().
 //
-// The boolean retun value returned is intended to provide a convenient mechanism to
+// The boolean returned is intended to provide a convenient mechanism to
 // to enumerate and process events, it should not be considered an indication
 // of the status of a call to Next(). To undertand the outcomes of operations the
 // stream's Err() field should be inspected. It is left to the user to determine
@@ -71,7 +71,7 @@ func (s *StreamReader) Next() bool {
 	// version number.
 	if s.feedPage == nil {
 		s.index = -1
-		url, err := getFeedURL(s.streamName, "forward", s.nextVersion, s.pageSize)
+		url, err := GetFeedURL(s.streamName, "forward", s.nextVersion, s.pageSize)
 		if err != nil {
 			s.lasterr = err
 			return false

@@ -273,7 +273,7 @@ func GetFeedURL(stream, direction string, version int, pageSize int) (string, er
 // http://docs.geteventstore.com/http-api/3.7.0/stream-metadata/
 func (c *Client) GetMetadataURL(stream string) (string, *Response, error) {
 
-	url, err := getFeedURL(stream, "forward", 0, 1)
+	url, err := GetFeedURL(stream, "forward", 0, 1)
 	if err != nil {
 		return "", nil, err
 	}
