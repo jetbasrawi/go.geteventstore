@@ -12,8 +12,44 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/jetbasrawi/goes/internal/atom"
+	"github.com/jetbasrawi/go.geteventstore/internal/atom"
 )
+
+// Response encapsulates HTTP responses from the server.
+//
+// A Response object contains the raw http response, the status code returned
+// and the status message returned.
+//
+// A Response object is returned from all methods on the client that interact
+// with the the eventstore.
+// It is intended to provide access to data about the response in case
+// the user wants to inspect the response such as the status or the raw http
+// response.
+type Response struct {
+	*http.Response
+	Status     string
+	StatusCode int
+}
+
+// ErrorResponse encapsulates data about an interaction with the eventstore that
+// produced an HTTP error.
+//
+// An ErrorResponse embeds the raw *http.Response and provides access to the raw
+// http.Request that resulted in an error.
+// Status contains the status message returned from the server.
+// StatusCode contains the status code returned from the server.
+type ErrorResponse struct {
+	*http.Response
+	Request    *http.Request
+	Status     string
+	StatusCode int
+}
+
+func (r *ErrorResponse) Error() string {
+	return fmt.Sprintf("%v %v: %d %+v",
+		r.Response.Request.Method, r.Response.Request.URL,
+		r.Response.StatusCode, r.Status)
+}
 
 type basicAuthCredentials struct {
 	Username string
@@ -21,34 +57,42 @@ type basicAuthCredentials struct {
 }
 
 // Client is the interface that the client should implement
-type Client interface {
-	NewStreamReader(streamName string) StreamReader
-	NewStreamWriter(streamName string) StreamWriter
-	SetBasicAuth(username, password string)
-	NewRequest(method, urlString string, body interface{}) (*http.Request, error)
-	Do(req *http.Request, v io.Writer) (*Response, error)
-	GetEvent(url string) (*EventResponse, *Response, error)
-	GetMetadataURL(stream string) (string, *Response, error)
-	ReadFeed(url string) (*atom.Feed, *Response, error)
-	SetHeader(key, value string)
-	DeleteHeader(key string)
-}
+// type Client interface {
+// 	NewStreamReader(streamName string) *StreamReader
+// 	NewStreamWriter(streamName string) *StreamWriter
+// 	SetBasicAuth(username, password string)
+// 	NewRequest(method, urlString string, body interface{}) (*http.Request, error)
+// 	Do(req *http.Request, v io.Writer) (*Response, error)
+// 	GetEvent(url string) (*EventResponse, *Response, error)
+// 	GetMetadataURL(stream string) (string, *Response, error)
+// 	ReadFeed(url string) (*atom.Feed, *Response, error)
+// 	SetHeader(key, value string)
+// 	DeleteHeader(key string)
+// }
 
-// Client is the type used to interact with the eventstore.
+// Client is a database handle for an eventstore server.
 //
-// Use the NewClient constructor to get a client.
-type client struct {
+// The client is used to store connection details such as server URL,
+// basic authentication credentials and headers.
+//
+// The client also provides methods interacting with the eventstore.
+//
+// In general, the StreamReader and StreamWriter should be used to
+// interact with the eventstore. These methods further abstract methods
+// on the client, however you can also directly use methods on the client
+// to interact with the eventstore if necessary.
+type Client struct {
 	client      *http.Client
 	baseURL     *url.URL
 	credentials *basicAuthCredentials
 	headers     map[string]string
 }
 
-// NewClient constructs and returns a new client.
+// NewClient returns a new client.
 //
 // httpClient will usually be nil and will use the http.DefaultClient.
 // serverURL is the url to your eventstore server.
-func NewClient(httpClient *http.Client, serverURL string) (Client, error) {
+func NewClient(httpClient *http.Client, serverURL string) (*Client, error) {
 	if httpClient == nil {
 		httpClient = http.DefaultClient
 	}
@@ -57,7 +101,7 @@ func NewClient(httpClient *http.Client, serverURL string) (Client, error) {
 		return nil, err
 	}
 
-	c := &client{
+	c := &Client{
 		client:  httpClient,
 		baseURL: baseURL,
 		headers: make(map[string]string),
@@ -66,9 +110,9 @@ func NewClient(httpClient *http.Client, serverURL string) (Client, error) {
 	return c, nil
 }
 
-// NewStreamReader constructs a new StreamReader instance
-func (c *client) NewStreamReader(streamName string) StreamReader {
-	return &streamReader{
+// NewStreamReader returns a new *StreamReader.
+func (c *Client) NewStreamReader(streamName string) *StreamReader {
+	return &StreamReader{
 		streamName: streamName,
 		client:     c,
 		version:    -1,
@@ -76,9 +120,9 @@ func (c *client) NewStreamReader(streamName string) StreamReader {
 	}
 }
 
-// NewStreamWriter constructs a new StreamWriter instance
-func (c *client) NewStreamWriter(streamName string) StreamWriter {
-	return &streamWriter{
+// NewStreamWriter returns a new *StreamWriter.
+func (c *Client) NewStreamWriter(streamName string) *StreamWriter {
+	return &StreamWriter{
 		client:     c,
 		streamName: streamName,
 	}
@@ -86,17 +130,15 @@ func (c *client) NewStreamWriter(streamName string) StreamWriter {
 
 // SetBasicAuth sets the credentials for requests.
 //
-// Requests will retrieve the credentials from the client before each request and
-// so credentials can be changed without the need to create a new StreamReader or
-// StreamWriter.
-func (c *client) SetBasicAuth(username, password string) {
+// Credentials will be read from the client before each request.
+func (c *Client) SetBasicAuth(username, password string) {
 	c.credentials = &basicAuthCredentials{
 		Username: username,
 		Password: password,
 	}
 }
 
-// GetEvent gets a single event
+// GetEvent reads a single event from the eventstore.
 //
 // The event response will be nil in an error case.
 // *Response may be nil if an error occurs before the http request. Otherwise
@@ -104,9 +146,9 @@ func (c *client) SetBasicAuth(username, password string) {
 // If an error occurs during the http request an *ErrorResponse will be returned
 // as the error. The *ErrorResponse will contain the raw http response and status
 // and a description of the error.
-func (c *client) GetEvent(url string) (*EventResponse, *Response, error) {
+func (c *Client) GetEvent(url string) (*EventResponse, *Response, error) {
 
-	r, err := c.NewRequest("GET", url, nil)
+	r, err := c.newRequest("GET", url, nil)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -114,7 +156,7 @@ func (c *client) GetEvent(url string) (*EventResponse, *Response, error) {
 	r.Header.Set("Accept", "application/vnd.eventstore.atom+json")
 
 	var b bytes.Buffer
-	resp, err := c.Do(r, &b)
+	resp, err := c.do(r, &b)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -155,42 +197,7 @@ func (c *client) GetEvent(url string) (*EventResponse, *Response, error) {
 	return &e, resp, nil
 }
 
-// Response encapsulates data from the http response.
-//
-// A Response object is returned from all method interacting with the eventstore
-// server. It is intended to provide access to data about the response in case
-// the user wants to inspect the response such as the status or the raw http
-// response.
-//
-// A Response object contains the raw http response, the status code returned
-// and the status message returned.
-type Response struct {
-	*http.Response
-	StatusCode    int
-	StatusMessage string
-}
-
-// ErrorResponse encapsulates data about an interaction with the eventstore that
-// produced an http error.
-//
-// Response contains the raw http response.
-// Message contains the status message returned from the server.
-// StatusCode contains the status code returned from the server.
-type ErrorResponse struct {
-	*http.Response // HTTP response that caused this error
-	Request        *http.Request
-	Message        string
-	StatusCode     int
-}
-
-func (r *ErrorResponse) Error() string {
-	return fmt.Sprintf("%v %v: %d %+v",
-		r.Response.Request.Method, r.Response.Request.URL,
-		r.Response.StatusCode, r.Message)
-}
-
-// ReadFeed reads a stream atom feed page specified by the url.
-// returns an *atom.Feed object
+// ReadFeed reads a streams atom feed page returns an *atom.Feed.
 //
 // The feed object returned may be nil in case of an error.
 // The *Response may also be nil if the error occurred before the http request.
@@ -198,9 +205,9 @@ func (r *ErrorResponse) Error() string {
 // raw http response and status.
 // If the error occurred during the http request an *ErrorResponse will be returned
 // and this will also contain the raw http request and status and an error message.
-func (c *client) ReadFeed(url string) (*atom.Feed, *Response, error) {
+func (c *Client) ReadFeed(url string) (*atom.Feed, *Response, error) {
 
-	req, err := c.NewRequest("GET", url, nil)
+	req, err := c.newRequest("GET", url, nil)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -208,7 +215,7 @@ func (c *client) ReadFeed(url string) (*atom.Feed, *Response, error) {
 	req.Header.Set("Accept", "application/atom+xml")
 
 	var b bytes.Buffer
-	resp, err := c.Do(req, &b)
+	resp, err := c.do(req, &b)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -225,8 +232,8 @@ func (c *client) ReadFeed(url string) (*atom.Feed, *Response, error) {
 // according to the documentation the metadata url should be acquired through
 // a query to the stream feed as the authors of GetEventStore reserve the right
 // to change the url.
-// http://docs.geteventstore.com/http-api/3.6.0/stream-metadata/
-func (c *client) GetMetadataURL(stream string) (string, *Response, error) {
+// http://docs.geteventstore.com/http-api/3.7.0/stream-metadata/
+func (c *Client) GetMetadataURL(stream string) (string, *Response, error) {
 
 	url, err := getFeedURL(stream, "forward", 0, 1)
 	if err != nil {
@@ -245,18 +252,20 @@ func (c *client) GetMetadataURL(stream string) (string, *Response, error) {
 	return "", resp, nil
 }
 
-// SetHeader adds a header to the collection of headers that will be used on http requests
-func (c *client) SetHeader(key, value string) {
+// SetHeader adds a header to the collection of headers that will be used on http requests.
+//
+// Any headers that are set on the client will be included in requests to the eventstore.
+func (c *Client) SetHeader(key, value string) {
 	c.headers[key] = value
 }
 
-// DeleteHeader deletes a header from the collection of headers
-func (c *client) DeleteHeader(key string) {
+// DeleteHeader deletes a header from the collection of headers.
+func (c *Client) DeleteHeader(key string) {
 	delete(c.headers, key)
 }
 
-// NewRequest creates a new *http.Request that can be used to execute requests to the server
-func (c *client) NewRequest(method, urlString string, body interface{}) (*http.Request, error) {
+// newRequest creates a new *http.Request that can be used to execute requests to the server
+func (c *Client) newRequest(method, urlString string, body interface{}) (*http.Request, error) {
 
 	url, err := url.Parse(urlString)
 	if err != nil {
@@ -292,13 +301,13 @@ func (c *client) NewRequest(method, urlString string, body interface{}) (*http.R
 	return req, nil
 }
 
-// Do executes requests to the server.
+// do executes requests to the server.
 //
 // The response body is copied into v if v is not nil.
 // Returns a *Response that wraps the http.Response returned from the server.
 // The response body is available in the *Response in case the consumer wishes
 // to process it in some way rather than read if from the argument v
-func (c *client) Do(req *http.Request, v io.Writer) (*Response, error) {
+func (c *Client) do(req *http.Request, v io.Writer) (*Response, error) {
 
 	// keep is a copy of the request body that will be returned
 	// with the response for diagnostic purposes.
@@ -351,6 +360,8 @@ func (c *client) Do(req *http.Request, v io.Writer) (*Response, error) {
 	return response, nil
 }
 
+// getError inspects the HTTP response and constructs an appropriate error if
+// the response was an error.
 func getError(r *http.Response, req *http.Request) error {
 	if c := r.StatusCode; 200 <= c && c <= 299 {
 		return nil
@@ -361,7 +372,7 @@ func getError(r *http.Response, req *http.Request) error {
 	if err == nil && data != nil {
 		json.Unmarshal(data, errorResponse)
 	}
-	errorResponse.Message = r.Status
+	errorResponse.Status = r.Status
 	errorResponse.StatusCode = r.StatusCode
 	errorResponse.Request = req
 
@@ -439,7 +450,7 @@ func getEventURLs(f *atom.Feed) ([]string, error) {
 // newResponse creates a new Response for the provided http.Response.
 func newResponse(r *http.Response) *Response {
 	response := &Response{Response: r}
-	response.StatusMessage = r.Status
+	response.Status = r.Status
 	response.StatusCode = r.StatusCode
 	return response
 }

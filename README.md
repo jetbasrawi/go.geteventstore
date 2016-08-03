@@ -1,17 +1,21 @@
-#GOES [![license](https://img.shields.io/github/license/mashape/apistatus.svg?maxAge=2592000)](https://opensource.org/licenses/MIT) [![Go Report Card](https://goreportcard.com/badge/github.com/jetbasrawi/goes)](https://goreportcard.com/report/github.com/jetbasrawi/goes)
+#Go.GetEventStore [![license](https://img.shields.io/github/license/mashape/apistatus.svg?maxAge=2592000)](https://opensource.org/licenses/MIT) [![Go Report Card](https://goreportcard.com/badge/github.com/jetbasrawi/goteventstore/goes)](https://goreportcard.com/report/github.com/jetbasrawi/goteventstore/goes)
 
 ##A Golang HTTP Client for EventStore 
-
-GOES is a http client for [EventStore](https://geteventstore.com) written in Go. The 
+Go.GetEventStore is a http client for [GetEventStore](https://geteventstore.com) written in Go. The 
 client abstracts interaction with the GetEventStore HTTP API providing easy to use features 
-for reading and writing events and event metadata.
+for reading and writing of events and event metadata.
 
 Below are some code examples giving a summary view of how the client works. To learn to use 
-the client in more detail, commented example code can be found in the examples directory.
+the client in more detail, heavily commented example code can be found in the examples directory.
+
+###Get the package
+```
+    $ go get github.com/jetbasrawi/go.geteventstore/goes"
+```
 
 ###Import the package
 ```go 
-    import "github.com/jetbasrawi/goes"
+    import "github.com/jetbasrawi/go.geteventstore/goes"
 ```
 
 
@@ -105,7 +109,6 @@ events can be found in the simulator example.
         if err != nil {
             // Handle errors that occured during deserialization
         }
-
     }
 
 ```

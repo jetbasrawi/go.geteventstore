@@ -25,9 +25,9 @@ func (s *ClientSuite) TearDownTest(c *C) {
 	teardown()
 }
 
-func newTestClient() *client {
+func newTestClient() *Client {
 	baseURL, _ := url.Parse(server.URL)
-	return &client{
+	return &Client{
 		client:  http.DefaultClient,
 		baseURL: baseURL,
 		headers: make(map[string]string),
@@ -71,14 +71,16 @@ func (s *ClientSuite) TestUnmarshalFeed(c *C) {
 }
 
 func (s *ClientSuite) TestConstructNewClient(c *C) {
-	invalidURL := ":"
-	ct, err := NewClient(nil, invalidURL)
-	c.Assert(err, ErrorMatches, "parse :: missing protocol scheme")
+	ct, err := NewClient(nil, server.URL)
+	got, want := ct.baseURL.String(), server.URL
+	c.Assert(err, IsNil)
+	c.Assert(got, Equals, want)
+}
 
-	if cl, ok := ct.(*client); ok {
-		got, want := cl.baseURL.String(), defaultBaseURL
-		c.Assert(got, Equals, want)
-	}
+func (s *ClientSuite) TestConstructNewClientInvalidURL(c *C) {
+	invalidURL := ":"
+	_, err := NewClient(nil, invalidURL)
+	c.Assert(err, ErrorMatches, "parse :: missing protocol scheme")
 }
 
 func (s *ClientSuite) TestNewRequest(c *C) {
@@ -86,7 +88,7 @@ func (s *ClientSuite) TestNewRequest(c *C) {
 	reqBody := &Event{EventID: "some-uuid", EventType: "SomeEventType", Data: "some-string"}
 	eventStructJSON := `{"eventType":"SomeEventType","eventId":"some-uuid","data":"some-string"}`
 	outBody := eventStructJSON + "\n"
-	req, _ := eventStoreClient.NewRequest("GET", reqURL, reqBody)
+	req, _ := eventStoreClient.newRequest("GET", reqURL, reqBody)
 
 	// test that the relative url was concatenated
 	c.Assert(req.URL.String(), Equals, outURL)
@@ -119,14 +121,14 @@ func (s *ClientSuite) TestNewRequestWithInvalidJSONReturnsError(c *C) {
 		A map[int]interface{}
 	}
 	ti := &T{}
-	_, err := eventStoreClient.NewRequest(http.MethodGet, "/", ti)
+	_, err := eventStoreClient.newRequest(http.MethodGet, "/", ti)
 	c.Assert(err, NotNil)
 	tp := reflect.TypeOf(ti.A)
 	c.Assert(err, FitsTypeOf, &json.UnsupportedTypeError{Type: tp})
 }
 
 func (s *ClientSuite) TestNewRequestWithBadURLReturnsError(c *C) {
-	_, err := eventStoreClient.NewRequest(http.MethodGet, ":", nil)
+	_, err := eventStoreClient.newRequest(http.MethodGet, ":", nil)
 	c.Assert(err, ErrorMatches, "parse :: missing protocol scheme")
 }
 
@@ -137,7 +139,7 @@ func (s *ClientSuite) TestNewRequestWithBadURLReturnsError(c *C) {
 // certain cases, intermediate systems may treat these differently resulting in
 // subtle errors.
 func (s *ClientSuite) TestNewRequestWithEmptyBody(c *C) {
-	req, err := eventStoreClient.NewRequest(http.MethodGet, "/", nil)
+	req, err := eventStoreClient.newRequest(http.MethodGet, "/", nil)
 	c.Assert(err, IsNil)
 	c.Assert(req.Body, IsNil)
 }
@@ -153,14 +155,14 @@ func (s *ClientSuite) TestDo(c *C) {
 		fmt.Fprint(w, body)
 	})
 
-	req, _ := eventStoreClient.NewRequest(http.MethodPost, "/", nil)
-	resp, err := eventStoreClient.Do(req, nil)
+	req, _ := eventStoreClient.newRequest(http.MethodPost, "/", nil)
+	resp, err := eventStoreClient.do(req, nil)
 	c.Assert(err, IsNil)
 
 	want := &Response{
-		Response:      resp.Response,
-		StatusCode:    http.StatusCreated,
-		StatusMessage: "201 Created"}
+		Response:   resp.Response,
+		StatusCode: http.StatusCreated,
+		Status:     "201 Created"}
 
 	c.Assert(want, DeepEquals, resp)
 }
@@ -171,9 +173,9 @@ func (s *ClientSuite) TestErrorResponseContainsCopyOfTheOriginalRequest(c *C) {
 		fmt.Fprintf(w, "")
 	})
 
-	req, _ := eventStoreClient.NewRequest(http.MethodPost, "/", "[{\"some_field\": 34534}]")
+	req, _ := eventStoreClient.newRequest(http.MethodPost, "/", "[{\"some_field\": 34534}]")
 
-	_, err := eventStoreClient.Do(req, nil)
+	_, err := eventStoreClient.do(req, nil)
 
 	if e, ok := err.(*BadRequestError); ok {
 		c.Assert(e.ErrorResponse.Request, DeepEquals, req)
@@ -188,13 +190,13 @@ func (s *ClientSuite) TestErrorResponseContainsStatusCodeAndMessage(c *C) {
 		fmt.Fprintf(w, "Response Body")
 	})
 
-	req, _ := eventStoreClient.NewRequest(http.MethodPost, "/", nil)
+	req, _ := eventStoreClient.newRequest(http.MethodPost, "/", nil)
 
-	_, err := eventStoreClient.Do(req, nil)
+	_, err := eventStoreClient.do(req, nil)
 
 	if e, ok := err.(*BadRequestError); ok {
 		c.Assert(e.ErrorResponse.StatusCode, Equals, http.StatusBadRequest)
-		c.Assert(e.ErrorResponse.Message, Equals, "400 Bad Request")
+		c.Assert(e.ErrorResponse.Status, Equals, "400 Bad Request")
 	} else {
 		c.FailNow()
 	}

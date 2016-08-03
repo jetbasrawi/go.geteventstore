@@ -96,28 +96,3 @@ type TimeStr string
 func Time(t time.Time) TimeStr {
 	return TimeStr(t.Format("2006-01-02T15:04:05-07:00"))
 }
-
-// ToEventData creates a new event object.
-//
-// If an empty eventId is provided a new uuid will be generated
-// and retured in the event.
-// If an empty eventType is provided the eventType will be set to the
-// name of the type provided.
-// data and meta can be nil
-func ToEventData(eventID, eventType string, data interface{}, meta interface{}) *Event {
-	e := &Event{}
-
-	e.EventID = eventID
-	if eventID == "" {
-		e.EventID = NewUUID()
-	}
-
-	e.EventType = eventType
-	if eventType == "" {
-		e.EventType = typeOf(data)
-	}
-
-	e.Data = data
-	e.MetaData = meta
-	return e
-}

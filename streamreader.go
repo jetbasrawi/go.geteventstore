@@ -6,24 +6,13 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/jetbasrawi/goes/internal/atom"
+	"github.com/jetbasrawi/go.geteventstore/internal/atom"
 )
 
-// StreamReader is the interface that the streamReader should implement
-type StreamReader interface {
-	Version() int
-	NextVersion(version int)
-	Err() error
-	Next() bool
-	Scan(e interface{}, m interface{}) error
-	MetaData() (*EventResponse, error)
-	EventResponse() *EventResponse
-	LongPoll(seconds int)
-}
-
-type streamReader struct {
+// StreamReader provides functions
+type StreamReader struct {
 	streamName    string
-	client        Client
+	client        *Client
 	version       int
 	nextVersion   int
 	index         int
@@ -36,22 +25,22 @@ type streamReader struct {
 }
 
 // Err returns any error that is raised as a result of a call to Next() or Scan()
-func (s *streamReader) Err() error {
+func (s *StreamReader) Err() error {
 	return s.lasterr
 }
 
 // Version returns the current stream version of the reader
-func (s *streamReader) Version() int {
+func (s *StreamReader) Version() int {
 	return s.version
 }
 
 // NextVersion is the version of the stream that will be returned by a call to Next()
-func (s *streamReader) NextVersion(version int) {
+func (s *StreamReader) NextVersion(version int) {
 	s.nextVersion = version
 }
 
 // EventResponse returns the container for the event that is returned from a call to Next().
-func (s *streamReader) EventResponse() *EventResponse {
+func (s *StreamReader) EventResponse() *EventResponse {
 	return s.eventResponse
 }
 
@@ -129,13 +118,12 @@ func (s *streamReader) EventResponse() *EventResponse {
 //UnauthorizedError
 //If the request has insufficient permissions to access the
 //stream an UnauthorizedError will be returned.
-
 // TemporarilyUnavailableError
 // 503 ServiceUnavailable is returned if the server is temporarily unable
 // to handle the request. This can occur during startup of the eventstore
 // for a brief period after the server has come online but is not yet ready
 // to handle requests
-func (s *streamReader) Next() bool {
+func (s *StreamReader) Next() bool {
 	s.lasterr = nil
 
 	numEntries := 0
@@ -206,7 +194,7 @@ func (s *streamReader) Next() bool {
 
 // Scan deserializes event and event metadata into the types passed in
 // as arguments e and m.
-func (s *streamReader) Scan(e interface{}, m interface{}) error {
+func (s *StreamReader) Scan(e interface{}, m interface{}) error {
 
 	if s.lasterr != nil {
 		return s.lasterr
@@ -259,7 +247,7 @@ func (s *streamReader) Scan(e interface{}, m interface{}) error {
 // request to be made with ES-LongPoll set to that value. Any value 0 or below
 // will cause the request to be made without ES-LongPoll and the server will not
 // wait to return.
-func (s *streamReader) LongPoll(seconds int) {
+func (s *StreamReader) LongPoll(seconds int) {
 	if seconds > 0 {
 		s.client.SetHeader("ES-LongPoll", strconv.Itoa(seconds))
 	} else {
@@ -273,7 +261,7 @@ func (s *streamReader) LongPoll(seconds int) {
 //
 // For more information on stream metadata see:
 // http://docs.geteventstore.com/http-api/3.7.0/stream-metadata/
-func (s *streamReader) MetaData() (*EventResponse, error) {
+func (s *StreamReader) MetaData() (*EventResponse, error) {
 	url, _, err := s.client.GetMetadataURL(s.streamName)
 	if err != nil {
 		return nil, err

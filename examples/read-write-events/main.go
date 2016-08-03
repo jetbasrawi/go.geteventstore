@@ -7,7 +7,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/jetbasrawi/goes"
+	"github.com/jetbasrawi/go.geteventstore"
 )
 
 var eventActivators map[string]func() (interface{}, interface{})
@@ -61,7 +61,7 @@ func main() {
 
 }
 
-func readEvents(client goes.Client, streamName string) {
+func readEvents(client *goes.Client, streamName string) {
 
 	log.Printf("\nReading events from the eventstore\n")
 
@@ -107,6 +107,7 @@ func readEvents(client goes.Client, streamName string) {
 			// returns a TemporarilyUnavailableError and here we respond to this
 			// with a retry after some duration.
 			case *url.Error, *goes.TemporarilyUnavailableError:
+				log.Println("The server is not ready. Will retry after 30 seconds.")
 				<-time.After(time.Duration(30) * time.Second)
 
 			// If a stream is not found a StreamDoesNotExistError is returned.
@@ -151,11 +152,11 @@ func readEvents(client goes.Client, streamName string) {
 			if f, ok := eventActivators[reader.EventResponse().Event.EventType]; ok {
 				event, meta = f()
 				// Call scan on the reader passing in pointers to the event and meta data targets
-				err := reader.Scan(&event, &meta)
-				// Check for any errors that have occurred during deserialization
-				if err != nil {
+				if err := reader.Scan(&event, &meta); err != nil {
+					// Check for any errors that have occurred during deserialization
 					log.Fatal(err)
 				}
+
 				log.Printf("\n Event %d returned %#v\n Meta returned %#v\n\n", reader.EventResponse().Event.EventNumber, event, meta)
 			} else {
 				log.Fatalf("Could not instantiate event of type %s", reader.EventResponse().Event.EventType)
@@ -164,7 +165,7 @@ func readEvents(client goes.Client, streamName string) {
 	}
 }
 
-func writeEvents(client goes.Client, streamName string) {
+func writeEvents(client *goes.Client, streamName string) {
 	// Create two events and their associated metadata demonstrating how
 	// to write events and event metadata to the eventstore.
 

@@ -6,18 +6,39 @@ import (
 	"strconv"
 )
 
-// StreamWriter is the interface that stream writers should implement
-type StreamWriter interface {
-	Append(*int, ...*Event) error
-	WriteMetaData(string, interface{}) error
+// ToEventData creates a new event object.
+//
+// If an empty eventId is provided a new uuid will be generated
+// and retured in the event.
+// If an empty eventType is provided the eventType will be set to the
+// name of the type provided.
+// data and meta can be nil
+func ToEventData(eventID, eventType string, data interface{}, meta interface{}) *Event {
+	e := &Event{}
+
+	e.EventID = eventID
+	if eventID == "" {
+		e.EventID = NewUUID()
+	}
+
+	e.EventType = eventType
+	if eventType == "" {
+		e.EventType = typeOf(data)
+	}
+
+	e.Data = data
+	e.MetaData = meta
+	return e
 }
 
-type streamWriter struct {
-	client     Client
+// StreamWriter provides methods for writing events and metadata to an
+// event stream
+type StreamWriter struct {
+	client     *Client
 	streamName string
 }
 
-// AppendToStream writes an event to the head of the stream
+// Append writes an event to the head of the stream
 //
 // If the stream does not exist, it will be created.
 //
@@ -26,9 +47,9 @@ type streamWriter struct {
 // -2 : The write should never conflict with anything and should always succeed
 // -1 : The stream should not exist at the time of writing. This write will create it.
 //  0 : The stream should exist but it should be empty
-func (s *streamWriter) Append(expectedVersion *int, events ...*Event) error {
+func (s *StreamWriter) Append(expectedVersion *int, events ...*Event) error {
 	u := fmt.Sprintf("/streams/%s", s.streamName)
-	req, err := s.client.NewRequest(http.MethodPost, u, events)
+	req, err := s.client.newRequest(http.MethodPost, u, events)
 	if err != nil {
 		return err
 	}
@@ -38,7 +59,7 @@ func (s *streamWriter) Append(expectedVersion *int, events ...*Event) error {
 		req.Header.Set("ES-ExpectedVersion", strconv.Itoa(*expectedVersion))
 	}
 
-	_, err = s.client.Do(req, nil)
+	_, err = s.client.do(req, nil)
 	if err != nil {
 		if e, ok := err.(*BadRequestError); ok {
 			return &ConcurrencyError{ErrorResponse: e.ErrorResponse}
@@ -64,20 +85,20 @@ func (s *streamWriter) Append(expectedVersion *int, events ...*Event) error {
 // for inspection as an ErrorResponse field on the error.
 // If an error occurred outside of the http request another type of error will be returned
 // such as a *url.Error in cases where the streamwriter is unable to connect to the server.
-func (s *streamWriter) WriteMetaData(stream string, metadata interface{}) error {
+func (s *StreamWriter) WriteMetaData(stream string, metadata interface{}) error {
 	m := ToEventData("", "MetaData", metadata, nil)
 	mURL, _, err := s.client.GetMetadataURL(stream)
 	if err != nil {
 		return err
 	}
-	req, err := s.client.NewRequest(http.MethodPost, mURL, m)
+	req, err := s.client.newRequest(http.MethodPost, mURL, m)
 	if err != nil {
 		return err
 	}
 
 	req.Header.Set("Content-Type", "application/vnd.eventstore.events+json")
 
-	_, err = s.client.Do(req, nil)
+	_, err = s.client.do(req, nil)
 	if err != nil {
 		return err
 	}
