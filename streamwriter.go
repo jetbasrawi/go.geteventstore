@@ -19,8 +19,11 @@ type StreamWriter struct {
 //
 // There are some special version numbers that can be provided.
 // http://docs.geteventstore.com/http-api/3.7.0/writing-to-a-stream/
+//
 // -2 : The write should never conflict with anything and should always succeed
+//
 // -1 : The stream should not exist at the time of writing. This write will create it.
+//
 //  0 : The stream should exist but it should be empty
 func (s *StreamWriter) Append(expectedVersion *int, events ...*Event) error {
 	u := fmt.Sprintf("/streams/%s", s.streamName)
