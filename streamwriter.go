@@ -24,7 +24,7 @@ type StreamWriter struct {
 //
 // -1 : The stream should not exist at the time of writing. This write will create it.
 //
-//  0 : The stream should exist but it should be empty
+// 0 : The stream should exist but it should be empty
 func (s *StreamWriter) Append(expectedVersion *int, events ...*Event) error {
 	u := fmt.Sprintf("/streams/%s", s.streamName)
 	req, err := s.client.newRequest(http.MethodPost, u, events)
