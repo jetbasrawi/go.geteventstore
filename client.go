@@ -232,8 +232,7 @@ func (c *Client) ReadFeed(url string) (*atom.Feed, *Response, error) {
 	return feed, resp, nil
 }
 
-// GetFeedURL constructs the correct url format for the stream using the version
-// and take parameters.
+// GetFeedURL constructs the correct url format for the stream
 //
 // If version, take and direction are all nil or empty, the url returned will be
 // to read from the head of the stream backward
