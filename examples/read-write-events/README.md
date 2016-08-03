@@ -7,6 +7,6 @@ The code is heavily commented so just have a look at the code for further detail
 Once the server is up simply **go run** the examples.
 
 ```
-../goes/examples/read-write-events$ go run main.go
+$ go run main.go
 ```
 

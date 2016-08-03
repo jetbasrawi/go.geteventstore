@@ -6,5 +6,5 @@ To run these example you should have an eventstore server running on http://loca
 If you are a docker user you can set up an eventstore server using the included Docker Compose file.
 
 ```
-.../goes/examples/read-write-events$ docker-compose up
+$ docker-compose up
 ```

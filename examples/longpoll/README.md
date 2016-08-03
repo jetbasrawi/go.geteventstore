@@ -8,5 +8,5 @@ This example demonstrates how to do this.
 Once the server is up simply **go run** the examples.
 
 ```
-../goes/examples/longpoll$ go run main.go
+$ go run main.go
 ```
