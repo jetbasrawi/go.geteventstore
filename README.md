@@ -1,4 +1,4 @@
-#Go.GetEventStore [![license](https://img.shields.io/github/license/mashape/apistatus.svg?maxAge=2592000)](https://opensource.org/licenses/MIT) [![Go Report Card](https://goreportcard.com/badge/github.com/jetbasrawi/goteventstore/goes)](https://goreportcard.com/report/github.com/jetbasrawi/goteventstore/goes)
+#Go.GetEventStore [![license](https://img.shields.io/github/license/mashape/apistatus.svg?maxAge=2592000)](https://opensource.org/licenses/MIT) [![Go Report Card](https://goreportcard.com/badge/github.com/jetbasrawi/go.geteventstore)](https://goreportcard.com/report/github.com/jetbasrawi/go.geteventstore)
 
 ##A Golang HTTP Client for EventStore 
 Go.GetEventStore is a http client for [GetEventStore](https://geteventstore.com) written in Go. The 
