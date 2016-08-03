@@ -232,10 +232,10 @@ func (c *Client) ReadFeed(url string) (*atom.Feed, *Response, error) {
 	return feed, resp, nil
 }
 
-// GetFeedURL constructs the correct url format for the stream
+// GetFeedURL a URL for a stream atom feed page.
 //
-// If version, take and direction are all nil or empty, the url returned will be
-// to read from the head of the stream backward
+// If version and direction are nil or empty, the url returned will be
+// to read from the head of the stream backward.
 func GetFeedURL(stream, direction string, version int, pageSize int) (string, error) {
 
 	//TODO: Validate stream argumemt to ensure that it contains only url safe characters
