@@ -5,11 +5,6 @@ Go.GetEventStore is a http client for [GetEventStore](https://geteventstore.com)
 client abstracts interaction with the GetEventStore HTTP API providing easy to use features 
 for reading and writing of events and event metadata.
 
-###GetEventStore version compatability
-    - 3.5.0
-    - 3.6.0
-    - 3.7.0
-
 Below are some code examples giving a summary view of how the client works. To learn to use 
 the client in more detail, heavily commented example code can be found in the examples directory.
 
@@ -116,6 +111,21 @@ events can be found in the longpoll example.
     }
 
 ```
+
+###Deleting Streams
+
+The client supports both soft delete and hard delete of event streams. 
+
+```go
+
+    // Soft delete or hard delete is specified by a boolean argument
+    // here foostream will be soft deleted. 
+    resp, err := client.DeleteStream("foostream", false)
+
+```
+
+Example code for deleting streams can be found in the examples directory.
+
 
 ###Direct use of the client
 

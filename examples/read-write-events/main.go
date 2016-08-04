@@ -1,4 +1,7 @@
 // This example demonstrates how to write and read events and event metadata
+// The example will write two different event types to a stream and then read
+// them back and print them to the console.
+// The first event has metadata, the second event does not.
 
 package main
 
@@ -45,7 +48,7 @@ func main() {
 	// Set authentication credentials
 	client.SetBasicAuth("admin", "changeit")
 
-	streamName := "foostream"
+	streamName := goes.NewUUID()
 
 	// Set up some delegates to instantiate events for deserialization
 	// of the events returned from the eventstore.
@@ -59,11 +62,13 @@ func main() {
 	// Read the events back
 	readEvents(client, streamName)
 
+	log.Println("4. The example has successfully completed.")
+
 }
 
 func readEvents(client *goes.Client, streamName string) {
 
-	log.Printf("\nReading events from the eventstore\n")
+	log.Println("3. Reading events from the eventstore.")
 
 	// Create a new stream reader
 	reader := client.NewStreamReader(streamName)
@@ -157,9 +162,9 @@ func readEvents(client *goes.Client, streamName string) {
 					log.Fatal(err)
 				}
 
-				log.Printf("\n Event %d returned %#v\n Meta returned %#v\n\n", reader.EventResponse().Event.EventNumber, event, meta)
+				log.Printf(" - Event %d returned %#v\n Meta returned %#v\n", reader.EventResponse().Event.EventNumber, event, meta)
 			} else {
-				log.Fatalf("Could not instantiate event of type %s", reader.EventResponse().Event.EventType)
+				log.Fatalf("Error: Could not instantiate event of type %s", reader.EventResponse().Event.EventType)
 			}
 		}
 	}
@@ -199,7 +204,8 @@ func writeEvents(client *goes.Client, streamName string) {
 	goesEvent2 := goes.NewEvent("", "", event2, nil)
 
 	//Writing to the stream
-	log.Printf("\nWriting events to the eventstore\n")
+	log.Println("")
+	log.Printf("1. Writing events to the eventstore.")
 
 	// Create a new streamwriter passing in the name of the stream you want to write to.
 	// If the stream does not exist, it will be created when events are written to it.
@@ -214,7 +220,8 @@ func writeEvents(client *goes.Client, streamName string) {
 		log.Fatal(err)
 	}
 
-	log.Println("Writing to eventstore with an expected version that should error.")
+	log.Println(" - Events successfully written.")
+	log.Println("2. Writing to eventstore with an expected version that should error.")
 
 	// Lets repeat this but using an expected version that will cause an error
 	// to demonstrate handling concurrency errors
@@ -222,8 +229,6 @@ func writeEvents(client *goes.Client, streamName string) {
 	v := 0
 	err = writer.Append(&v, goesEvent1)
 	if err != nil {
-		log.Printf("Received expected error. %#v\n", err)
+		log.Printf(" - Received expected error. %#v\n", err)
 	}
-
-	log.Printf("Written 2 events to the eventStore.")
 }

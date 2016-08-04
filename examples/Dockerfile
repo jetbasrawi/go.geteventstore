@@ -1,7 +1,7 @@
 FROM ubuntu:14.04.2
 MAINTAINER Jet Basrawi <anewexplorer@gmail.com>
 
-ENV ES_VERSION 3.7.0
+ENV ES_VERSION 3.8.1
 
 ADD http://download.geteventstore.com/binaries/EventStore-OSS-Ubuntu-14.04-v$ES_VERSION.tar.gz /tmp/
 RUN tar xfz /tmp/EventStore-OSS-Ubuntu-14.04-v$ES_VERSION.tar.gz -C /opt
