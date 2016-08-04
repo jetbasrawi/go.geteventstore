@@ -1,13 +1,13 @@
 #Go.GetEventStore [![license](https://img.shields.io/badge/license-BSD-blue.svg?maxAge=2592000)](https://github.com/jetbasrawi/go.geteventstore/blob/master/LICENSE.md) [![Go Report Card](https://goreportcard.com/badge/github.com/jetbasrawi/go.geteventstore)](https://goreportcard.com/report/github.com/jetbasrawi/go.geteventstore) [![GoDoc](https://godoc.org/github.com/jetbasrawi/go.geteventstore?status.svg)](https://godoc.org/github.com/jetbasrawi/go.geteventstore)
 
-##A Golang client for the GetEventStore HTTP API. 
+##A Golang client for the GetEventStore 3.x HTTP API. 
 Go.GetEventStore is a http client for [GetEventStore](https://geteventstore.com) written in Go. The 
 client abstracts interaction with the GetEventStore HTTP API providing easy to use features 
 for reading and writing of events and event metadata.
 
 ###Supported Features
 | Feature | Description |
-|-----------------------------------|-------------|
+|---------|-------------|
 | **Write Events & Event Metadata** | Writing single and multiple events to a stream. Optionally expected version can be provided if you want to use optimistic concurrency features of the eventstore. |
 | **Read Events & Event Metadata** | Reading events & event metadata from a stream. |
 | **Read & Write Stream Metadata** | Read and writing stream metadata. |
