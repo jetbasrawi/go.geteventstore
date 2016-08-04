@@ -302,6 +302,39 @@ func (c *Client) DeleteHeader(key string) {
 	delete(c.headers, key)
 }
 
+// DeleteStream will delete a stream
+//
+// Streams may be soft deleted or hard deleted.
+//
+// Soft deleting a stream means that you can later recreate it simply by appending
+// events to it.
+//
+// Hard deleting a stream means that it has permanently been deleted and can never
+// be recreated.
+//
+// http://docs.geteventstore.com/http-api/3.8.0/deleting-a-stream/
+func (c *Client) DeleteStream(streamName string, hardDelete bool) (*Response, error) {
+
+	url := fmt.Sprintf("/streams/%s", streamName)
+
+	req, err := c.newRequest(http.MethodDelete, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if hardDelete {
+		req.Header.Set("ES-HardDelete", "true")
+	}
+
+	resp, err := c.do(req, nil)
+	if err != nil {
+		return resp, err
+	}
+
+	return resp, nil
+
+}
+
 // newRequest creates a new *http.Request that can be used to execute requests to the server
 func (c *Client) newRequest(method, urlString string, body interface{}) (*http.Request, error) {
 
@@ -365,7 +398,6 @@ func (c *Client) do(req *http.Request, v io.Writer) (*Response, error) {
 	// an error.
 	resp, err := c.client.Do(req)
 	if err != nil {
-		//TODO: Return a custom error wrapper
 		return nil, err
 	}
 
@@ -423,6 +455,8 @@ func getError(r *http.Response, req *http.Request) error {
 		return &ErrTemporarilyUnavailable{ErrorResponse: errorResponse}
 	case http.StatusNotFound:
 		return &ErrNotFound{ErrorResponse: errorResponse}
+	case http.StatusGone:
+		return &ErrDeleted{ErrorResponse: errorResponse}
 	default:
 		return &ErrUnexpected{ErrorResponse: errorResponse}
 	}

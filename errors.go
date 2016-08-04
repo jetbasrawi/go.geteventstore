@@ -25,6 +25,16 @@ func (e ErrNotFound) Error() string {
 	return "The stream does not exist."
 }
 
+// ErrDeleted is returned when a request is made to a stream that
+// has been hard deleted.
+type ErrDeleted struct {
+	ErrorResponse *ErrorResponse
+}
+
+func (e ErrDeleted) Error() string {
+	return "The stream has was deleted."
+}
+
 // ErrUnauthorized is returned when a request to the eventstore is
 // not authorized
 type ErrUnauthorized struct {

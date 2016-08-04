@@ -100,7 +100,7 @@ func Time(t time.Time) TimeStr {
 	return TimeStr(t.Format("2006-01-02T15:04:05-07:00"))
 }
 
-// ToEventData creates a new event object.
+// NewEvent creates a new event object.
 //
 // If an empty eventId is provided a new uuid will be generated automatically
 // and retured in the event.

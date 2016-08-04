@@ -32,7 +32,7 @@ type MyMetaDataType struct {
 	MetaField2 string `json:"my_meta_field_2"`
 }
 
-func (s *EventSuite) TestToEventData(c *C) {
+func (s *EventSuite) TestNewEvent(c *C) {
 	uuid := NewUUID()
 	eventType := "MyEventType"
 	data := &MyDataType{Field1: 555, Field2: "Some string"}
@@ -44,7 +44,7 @@ func (s *EventSuite) TestToEventData(c *C) {
 	c.Assert(got, DeepEquals, want)
 }
 
-func (s *EventSuite) TestToEventDataCreatesEventIDIfNotProvided(c *C) {
+func (s *EventSuite) TestNewEventCreatesEventIDIfNotProvided(c *C) {
 	eventType := "MyEventType"
 	data := &MyDataType{Field1: 555, Field2: "Some string"}
 	meta := &MyMetaDataType{MetaField1: 1010, MetaField2: "Some meta string"}
@@ -54,7 +54,7 @@ func (s *EventSuite) TestToEventDataCreatesEventIDIfNotProvided(c *C) {
 	c.Assert(got.EventID, Not(Equals), "")
 }
 
-func (s *EventSuite) TestToEventDataUsesTypeNameAsEventTypeIfNotProvided(c *C) {
+func (s *EventSuite) TestNewEventUsesTypeNameAsEventTypeIfNotProvided(c *C) {
 	uuid := NewUUID()
 	data := &MyDataType{Field1: 555, Field2: "Some string"}
 	meta := &MyMetaDataType{MetaField1: 1010, MetaField2: "Some meta string"}

@@ -1,9 +1,14 @@
-#Go.GetEventStore [![license](https://img.shields.io/github/license/mashape/apistatus.svg?maxAge=2592000)](https://opensource.org/licenses/MIT) [![Go Report Card](https://goreportcard.com/badge/github.com/jetbasrawi/go.geteventstore)](https://goreportcard.com/report/github.com/jetbasrawi/go.geteventstore) [![GoDoc](https://godoc.org/github.com/jetbasrawi/go.geteventstore?status.svg)](https://godoc.org/github.com/jetbasrawi/go.geteventstore)
+#Go.GetEventStore [![license](https://img.shields.io/badge/license-BSD%203-blue.svg?maxAge=2592000)](https://github.com/jetbasrawi/go.geteventstore/blob/master/LICENSE.md) [![Go Report Card](https://goreportcard.com/badge/github.com/jetbasrawi/go.geteventstore)](https://goreportcard.com/report/github.com/jetbasrawi/go.geteventstore) [![GoDoc](https://godoc.org/github.com/jetbasrawi/go.geteventstore?status.svg)](https://godoc.org/github.com/jetbasrawi/go.geteventstore)
 
-##A Golang HTTP Client for EventStore 
+##A Golang client for the GetEventStore HTTP API. 
 Go.GetEventStore is a http client for [GetEventStore](https://geteventstore.com) written in Go. The 
 client abstracts interaction with the GetEventStore HTTP API providing easy to use features 
 for reading and writing of events and event metadata.
+
+###GetEventStore version compatability
+    - 3.5.0
+    - 3.6.0
+    - 3.7.0
 
 Below are some code examples giving a summary view of how the client works. To learn to use 
 the client in more detail, heavily commented example code can be found in the examples directory.
@@ -46,9 +51,6 @@ Writing events and event metadata are supported via the StreamWriter.
 
 ```go
 
-    // Create a new StreamWriter
-    writer := client.NewStreamWriter("FooStream")
-
     // Create your event
 	myEvent := &FooEvent{
 		FooField: "Lorem Ipsum",
@@ -62,6 +64,9 @@ Writing events and event metadata are supported via the StreamWriter.
 
     // Wrap your event and event metadata in a goes.Event
 	myGoesEvent := goes.NewEvent(goes.NewUUID(), "FooEvent", myEvent, myEventMeta)
+
+    // Create a new StreamWriter
+    writer := client.NewStreamWriter("FooStream")
 
     // Write the event to the stream, here we pass nil as the expectedVersion as we 
     // are not wanting to flag concurrency errors

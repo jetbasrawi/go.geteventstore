@@ -48,7 +48,7 @@ func (s *ClientSuite) TestReadStream(c *C) {
 		c.Assert(r.Header.Get("Accept"), Equals, "application/atom+xml")
 	})
 
-	feed, resp, _ := eventStoreClient.ReadFeed(url)
+	feed, resp, _ := client.ReadFeed(url)
 	c.Assert(feed.PrettyPrint(), DeepEquals, f.PrettyPrint())
 	c.Assert(resp.StatusCode, DeepEquals, http.StatusOK)
 }
@@ -88,7 +88,7 @@ func (s *ClientSuite) TestNewRequest(c *C) {
 	reqBody := &Event{EventID: "some-uuid", EventType: "SomeEventType", Data: "some-string"}
 	eventStructJSON := `{"eventType":"SomeEventType","eventId":"some-uuid","data":"some-string"}`
 	outBody := eventStructJSON + "\n"
-	req, _ := eventStoreClient.newRequest("GET", reqURL, reqBody)
+	req, _ := client.newRequest("GET", reqURL, reqBody)
 
 	// test that the relative url was concatenated
 	c.Assert(req.URL.String(), Equals, outURL)
@@ -110,8 +110,8 @@ func (s *ClientSuite) TestRequestsAreSentWithBasicAuthIfSet(c *C) {
 		fmt.Fprintf(w, "")
 	})
 
-	eventStoreClient.SetBasicAuth("user", "pass")
-	streamReader := eventStoreClient.NewStreamReader("something")
+	client.SetBasicAuth("user", "pass")
+	streamReader := client.NewStreamReader("something")
 	_ = streamReader.Next()
 	c.Assert(authFound, Equals, true)
 }
@@ -121,14 +121,14 @@ func (s *ClientSuite) TestNewRequestWithInvalidJSONReturnsError(c *C) {
 		A map[int]interface{}
 	}
 	ti := &T{}
-	_, err := eventStoreClient.newRequest(http.MethodGet, "/", ti)
+	_, err := client.newRequest(http.MethodGet, "/", ti)
 	c.Assert(err, NotNil)
 	tp := reflect.TypeOf(ti.A)
 	c.Assert(err, FitsTypeOf, &json.UnsupportedTypeError{Type: tp})
 }
 
 func (s *ClientSuite) TestNewRequestWithBadURLReturnsError(c *C) {
-	_, err := eventStoreClient.newRequest(http.MethodGet, ":", nil)
+	_, err := client.newRequest(http.MethodGet, ":", nil)
 	c.Assert(err, ErrorMatches, "parse :: missing protocol scheme")
 }
 
@@ -139,7 +139,7 @@ func (s *ClientSuite) TestNewRequestWithBadURLReturnsError(c *C) {
 // certain cases, intermediate systems may treat these differently resulting in
 // subtle errors.
 func (s *ClientSuite) TestNewRequestWithEmptyBody(c *C) {
-	req, err := eventStoreClient.newRequest(http.MethodGet, "/", nil)
+	req, err := client.newRequest(http.MethodGet, "/", nil)
 	c.Assert(err, IsNil)
 	c.Assert(req.Body, IsNil)
 }
@@ -155,8 +155,8 @@ func (s *ClientSuite) TestDo(c *C) {
 		fmt.Fprint(w, body)
 	})
 
-	req, _ := eventStoreClient.newRequest(http.MethodPost, "/", nil)
-	resp, err := eventStoreClient.do(req, nil)
+	req, _ := client.newRequest(http.MethodPost, "/", nil)
+	resp, err := client.do(req, nil)
 	c.Assert(err, IsNil)
 
 	want := &Response{
@@ -173,9 +173,9 @@ func (s *ClientSuite) TestErrorResponseContainsCopyOfTheOriginalRequest(c *C) {
 		fmt.Fprintf(w, "")
 	})
 
-	req, _ := eventStoreClient.newRequest(http.MethodPost, "/", "[{\"some_field\": 34534}]")
+	req, _ := client.newRequest(http.MethodPost, "/", "[{\"some_field\": 34534}]")
 
-	_, err := eventStoreClient.do(req, nil)
+	_, err := client.do(req, nil)
 
 	if e, ok := err.(*ErrBadRequest); ok {
 		c.Assert(e.ErrorResponse.Request, DeepEquals, req)
@@ -190,9 +190,9 @@ func (s *ClientSuite) TestErrorResponseContainsStatusCodeAndMessage(c *C) {
 		fmt.Fprintf(w, "Response Body")
 	})
 
-	req, _ := eventStoreClient.newRequest(http.MethodPost, "/", nil)
+	req, _ := client.newRequest(http.MethodPost, "/", nil)
 
-	_, err := eventStoreClient.do(req, nil)
+	_, err := client.do(req, nil)
 
 	if e, ok := err.(*ErrBadRequest); ok {
 		c.Assert(e.ErrorResponse.StatusCode, Equals, http.StatusBadRequest)
@@ -233,7 +233,7 @@ func (s *ClientSuite) TestGetEvent(c *C) {
 		fmt.Fprint(w, str)
 	})
 
-	got, _, err := eventStoreClient.GetEvent("/streams/some-stream/299")
+	got, _, err := client.GetEvent("/streams/some-stream/299")
 	c.Assert(err, IsNil)
 	c.Assert(got.PrettyPrint(), Equals, want.PrettyPrint())
 }
@@ -249,4 +249,50 @@ func (s *ClientSuite) TestGetEventURLs(c *C) {
 		"http://localhost:2113/streams/some-stream/0",
 	}
 	c.Assert(got, DeepEquals, want)
+}
+
+func (s *ClientSuite) TestSoftDeleteStream(c *C) {
+	streamName := "foostream"
+	mux.HandleFunc("/streams/foostream", func(w http.ResponseWriter, r *http.Request) {
+		c.Assert(r.Method, Equals, http.MethodDelete)
+		h := r.Header.Get("ES-HardDelete")
+		c.Assert(h, DeepEquals, "")
+		w.WriteHeader(http.StatusNoContent)
+		fmt.Fprint(w, "")
+	})
+
+	resp, err := client.DeleteStream(streamName, false)
+	c.Assert(err, IsNil)
+	c.Assert(resp.StatusCode, Equals, http.StatusNoContent)
+}
+
+func (s *ClientSuite) TestHardDeleteStream(c *C) {
+	streamName := "foostream"
+	mux.HandleFunc("/streams/foostream", func(w http.ResponseWriter, r *http.Request) {
+		c.Assert(r.Method, Equals, http.MethodDelete)
+		h := r.Header.Get("ES-HardDelete")
+		c.Assert(h, DeepEquals, "true")
+		w.WriteHeader(http.StatusNoContent)
+		fmt.Fprint(w, "")
+	})
+
+	resp, err := client.DeleteStream(streamName, true)
+	c.Assert(err, IsNil)
+	c.Assert(resp.StatusCode, Equals, http.StatusNoContent)
+}
+
+func (s *ClientSuite) TestDeletingDeletedStreamReturnsDeletedError(c *C) {
+	streamName := "foostream"
+	mux.HandleFunc("/streams/foostream", func(w http.ResponseWriter, r *http.Request) {
+		c.Assert(r.Method, Equals, http.MethodDelete)
+		h := r.Header.Get("ES-HardDelete")
+		c.Assert(h, DeepEquals, "true")
+		w.WriteHeader(http.StatusGone)
+		fmt.Fprint(w, "")
+	})
+
+	resp, err := client.DeleteStream(streamName, true)
+	c.Assert(err, NotNil)
+	c.Assert(typeOf(err), Equals, "ErrDeleted")
+	c.Assert(resp.StatusCode, Equals, http.StatusGone)
 }

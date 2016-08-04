@@ -49,7 +49,7 @@ func (s *StreamWriterSuite) TestAppendEventsSingle(c *C) {
 		fmt.Fprint(w, "")
 	})
 
-	streamWriter := eventStoreClient.NewStreamWriter(streamName)
+	streamWriter := client.NewStreamWriter(streamName)
 	err := streamWriter.Append(nil, ev)
 
 	c.Assert(err, IsNil)
@@ -79,7 +79,7 @@ func (s *StreamWriterSuite) TestAppendEventsMultiple(c *C) {
 		fmt.Fprint(w, "")
 	})
 
-	streamWriter := eventStoreClient.NewStreamWriter(stream)
+	streamWriter := client.NewStreamWriter(stream)
 	err := streamWriter.Append(nil, ev1, ev2)
 
 	c.Assert(err, IsNil)
@@ -107,7 +107,7 @@ func (s *StreamWriterSuite) TestAppendEventsWithErrConcurrencyViolation(c *C) {
 
 	})
 
-	streamWriter := eventStoreClient.NewStreamWriter(stream)
+	streamWriter := client.NewStreamWriter(stream)
 	err := streamWriter.Append(&expectedVersion, ev)
 	c.Assert(err, NotNil)
 	c.Assert(typeOf(err), DeepEquals, "ErrConcurrencyViolation")
@@ -150,7 +150,7 @@ func (s *StreamWriterSuite) TestAppendStreamMetadata(c *C) {
 		fmt.Fprint(w, "")
 	})
 
-	writer := eventStoreClient.NewStreamWriter(stream)
+	writer := client.NewStreamWriter(stream)
 	err := writer.WriteMetaData(stream, &want)
 	c.Assert(err, IsNil)
 }
@@ -166,7 +166,7 @@ func (s *StreamWriterSuite) TestAppendStreamMetadataReturnsUnauthorisedWhenGetti
 	meta := fmt.Sprintf("{\"baz\":\"boo\"}")
 	want := json.RawMessage(meta)
 
-	writer := eventStoreClient.NewStreamWriter(stream)
+	writer := client.NewStreamWriter(stream)
 	err := writer.WriteMetaData(stream, &want)
 
 	c.Assert(err, NotNil)
@@ -188,7 +188,7 @@ func (s *StreamWriterSuite) TestAppendStreamMetadataReturnsTemporarilyUnavailabl
 	meta := fmt.Sprintf("{\"baz\":\"boo\"}")
 	want := json.RawMessage(meta)
 
-	writer := eventStoreClient.NewStreamWriter(stream)
+	writer := client.NewStreamWriter(stream)
 	err := writer.WriteMetaData(stream, &want)
 
 	c.Assert(err, NotNil)
@@ -210,7 +210,7 @@ func (s *StreamWriterSuite) TestAppendStreamMetadataReturnsErrUnexpectedWhenGett
 	meta := fmt.Sprintf("{\"baz\":\"boo\"}")
 	want := json.RawMessage(meta)
 
-	writer := eventStoreClient.NewStreamWriter(stream)
+	writer := client.NewStreamWriter(stream)
 	err := writer.WriteMetaData(stream, &want)
 
 	c.Assert(err, NotNil)
@@ -247,7 +247,7 @@ func (s *StreamWriterSuite) TestAppendStreamMetadataReturnsErrUnexpectedWhenWrit
 		fmt.Fprint(w, "")
 	})
 
-	writer := eventStoreClient.NewStreamWriter(stream)
+	writer := client.NewStreamWriter(stream)
 	err := writer.WriteMetaData(stream, &want)
 
 	c.Assert(err, NotNil)
@@ -284,7 +284,7 @@ func (s *StreamWriterSuite) TestAppendStreamMetadataReturnsErrUnauthorizedWhenWr
 		fmt.Fprint(w, "")
 	})
 
-	writer := eventStoreClient.NewStreamWriter(stream)
+	writer := client.NewStreamWriter(stream)
 	err := writer.WriteMetaData(stream, &want)
 
 	c.Assert(err, NotNil)
@@ -321,7 +321,7 @@ func (s *StreamWriterSuite) TestAppendStreamMetadataReturnsErrTemporarilyUnavail
 		fmt.Fprint(w, "")
 	})
 
-	writer := eventStoreClient.NewStreamWriter(stream)
+	writer := client.NewStreamWriter(stream)
 	err := writer.WriteMetaData(stream, &want)
 
 	c.Assert(err, NotNil)

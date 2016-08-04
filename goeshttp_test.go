@@ -31,7 +31,7 @@ var (
 	mux *http.ServeMux
 
 	// eventStoreClient is the EventStore client being tested
-	eventStoreClient *Client
+	client *Client
 
 	// server is a test HTTP server used to provide mack API responses
 	server *httptest.Server
@@ -58,7 +58,7 @@ func setup() {
 	server = httptest.NewServer(mux)
 
 	baseURL, _ := url.Parse(server.URL)
-	eventStoreClient = &Client{
+	client = &Client{
 		client:  http.DefaultClient,
 		baseURL: baseURL,
 		headers: make(map[string]string),
@@ -597,7 +597,7 @@ func (s *GoesSuite) TestTrickleFeed(c *C) {
 	}
 	mux.Handle("/", handler)
 
-	reader := eventStoreClient.NewStreamReader(stream)
+	reader := client.NewStreamReader(stream)
 
 	count := 0
 	for reader.Next() {
