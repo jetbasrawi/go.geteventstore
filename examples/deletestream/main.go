@@ -1,4 +1,8 @@
 // This example demonstrates soft deleting and hard deleting a stream.
+// The example will write an event to a stream then soft delete the stream.
+// After this a new event will be written to the soft deleted stream and the
+// stream will be undeleted. The stream will then be hard deleted and a subsequent
+// request to the stream will be shown to fail.
 
 package main
 

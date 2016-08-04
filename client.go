@@ -95,9 +95,9 @@ type Client struct {
 
 // NewClient returns a new client.
 //
-// httpClient will usually be nil and the client will use the http.DefaultClient. Should
-// you want to implement behaviours at the transport level you can provide your own
-// *http.Client
+// httpClient will usually be nil and the client will use the http.DefaultClient.
+// Should you want to implement behaviours at the transport level you can provide
+// your own *http.Client
 //
 // serverURL is the full URL to your eventstore server including protocol scheme and
 // port number.
