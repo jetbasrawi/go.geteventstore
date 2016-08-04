@@ -17,7 +17,7 @@ for reading and writing of events and event metadata.
 | Catch Up Subsription | Using long poll with a StreamReader provides an effective catch up subscription. |
 | Serialization & Deserialization of Events | The package handles serialization and deserialization of your application events to and from the eventstore. |
 | Reading Stream Atom Feed | The package provides methods for reading stream Atom feed pages, returning a fully typed struct representation. |
-
+| Setting Optional Headers | Optional headers can be added and removed. |
 
 Below are some code examples giving a summary view of how the client works. To learn to use 
 the client in more detail, heavily commented example code can be found in the examples directory.
@@ -166,6 +166,21 @@ Example code for deleting streams can be found in the examples directory.
 
 The StreamReader and StreamWriter types are the easiest way to read and write events. If you would like to implement
 some other logic around reading events, some methods are available on the Client type.
+
+###Setting Optional Headers 
+Most of the optional headers are are included implicitly such as ES-LongPoll, ES-ExpectedVersion & ES-HardDelete when 
+using LongPoll on the StreamReader or when appending events or deleting streams. However should you wish to use
+any of the others the can be set explicitly on the client. The only other ones you might want to use are ES-ResolveLinkTo, 
+ES-RequiresMaster or ES-TrustedAuth.
+
+```go
+    // Setting a header will mean all subsequent requests will include the header
+    client.SetHeader("ES-ResolveLinkTo", "false")
+
+    // Deleting a header means that it will not be included in any subsequent requests.
+    client.DeleteHeader("ES-ResolveLinkTo")
+
+```
 
 ###Feedback and requests welcome
 
