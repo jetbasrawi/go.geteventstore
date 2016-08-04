@@ -149,15 +149,15 @@ The client supports both soft delete and hard delete of event streams.
 
 Example code for deleting streams can be found in the examples directory.
 
-###Feedback and requests welcome
-
-This is a pretty new piece of work and criticism, comments or complements are most welcome.
-
-
 ###Direct use of the client
 
 The StreamReader and StreamWriter types are the easiest way to read and write events. If you would like to implement
 some other logic around reading events, some methods are available on the Client type.
+
+###Feedback and requests welcome
+
+This is a pretty new piece of work and criticism, comments or complements are most welcome.
+
 
 
 
