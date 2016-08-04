@@ -7,7 +7,7 @@ for reading and writing of events and event metadata.
 
 ###Supported Features
 | Feature | Description |
-|---------|-------------|
+|-----------------------------------|-------------|
 | **Write Events & Event Metadata** | Writing single and multiple events to a stream. Optionally expected version can be provided if you want to use optimistic concurrency features of the eventstore. |
 | **Read Events & Event Metadata** | Reading events & event metadata from a stream. |
 | **Read & Write Stream Metadata** | Read and writing stream metadata. |
