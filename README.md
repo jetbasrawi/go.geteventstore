@@ -110,6 +110,8 @@ events can be found in the longpoll example.
 
 ###Polling Head of Stream
 
+LongPoll provides an easy and efficient way to poll a stream listening for new events.
+
 ```go 
 
     reader := client.NewStreamReader("FooStream")
@@ -131,6 +133,8 @@ events can be found in the longpoll example.
 
 ```
 
+A more detailed example of using LongPoll can be found in the examples directory.
+
 ###Deleting Streams
 
 The client supports both soft delete and hard delete of event streams. 
@@ -144,6 +148,10 @@ The client supports both soft delete and hard delete of event streams.
 ```
 
 Example code for deleting streams can be found in the examples directory.
+
+###Feedback and requests welcome
+
+This is a pretty new piece of work and criticism, comments or complements are most welcome.
 
 
 ###Direct use of the client
