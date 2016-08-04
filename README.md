@@ -89,20 +89,16 @@ events can be found in the longpoll example.
 
     // Create a new goes.StreamReader
     reader := client.NewStreamReader("FooStream")
-
     // Call Next to get the next event
     for reader.Next() {
-
         // Check if the call resulted in an error. 
         if reader.Err() != nil {
             // Handle errors
         }
-
         // If the call did not result in an error then an event was returned
         // Create the application types to hold the deserialized even data and meta data
         fooEvent := FooEvent{}
         fooMeta := make(map[string]string)
-
         // Call scan to deserialize the event data and meta data into your types
         err := reader.Scan(&fooEvent, &fooMeta)
         if err != nil {
