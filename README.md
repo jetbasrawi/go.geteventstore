@@ -118,8 +118,6 @@ events can be found in the longpoll example.
 
     reader := client.NewStreamReader("FooStream")
     for reader.Next() {
-
-        // Check if the call resulted in an error. 
         if reader.Err() != nil {
             // When there are no more event in the stream, set LongPoll. 
             // The server will wait for 15 seconds in this case or until
