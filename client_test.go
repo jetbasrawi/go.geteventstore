@@ -1,3 +1,8 @@
+// Copyright 2016 Jet Basrawi. All rights reserved.
+//
+// Use of this source code is governed by a permissive BSD 3 Clause License
+// that can be found in the license file.
+
 package goes
 
 import (
@@ -242,7 +247,7 @@ func (s *ClientSuite) TestGetEventURLs(c *C) {
 	es := CreateTestEvents(2, "some-stream", "http://localhost:2113", "EventTypeX")
 	f, _ := CreateTestFeed(es, "http://localhost:2113/streams/some-stream/head/backward/2")
 
-	got, err := getEventURLs(f)
+	got, err := f.GetEventURLs()
 	c.Assert(err, IsNil)
 	want := []string{
 		"http://localhost:2113/streams/some-stream/1",
@@ -295,4 +300,71 @@ func (s *ClientSuite) TestDeletingDeletedStreamReturnsDeletedError(c *C) {
 	c.Assert(err, NotNil)
 	c.Assert(typeOf(err), Equals, "ErrDeleted")
 	c.Assert(resp.StatusCode, Equals, http.StatusGone)
+}
+
+func (s *ClientSuite) TestGetFeedPathForward(c *C) {
+	streamName := "foostream"
+	direction := "forward"
+	version := 0
+	pageSize := 10
+
+	want := fmt.Sprintf("/streams/%s/%d/%s/%d", streamName, version, direction, pageSize)
+
+	got, err := client.GetFeedPath(streamName, direction, version, pageSize)
+	c.Assert(err, IsNil)
+	c.Assert(got, DeepEquals, want)
+}
+
+func (s *ClientSuite) TestGetFeedPathBackward(c *C) {
+	streamName := "foostream"
+	direction := "backward"
+	version := 10
+	pageSize := 20
+
+	want := fmt.Sprintf("/streams/%s/%d/%s/%d", streamName, version, direction, pageSize)
+
+	got, err := client.GetFeedPath(streamName, direction, version, pageSize)
+	c.Assert(err, IsNil)
+	c.Assert(got, DeepEquals, want)
+}
+
+func (s *ClientSuite) TestGetFeedPathHeadBackward(c *C) {
+	streamName := "foostream"
+	direction := "backward"
+	version := -1
+	pageSize := 20
+
+	want := fmt.Sprintf("/streams/%s/%s/%s/%d", streamName, "head", direction, pageSize)
+
+	got, err := client.GetFeedPath(streamName, direction, version, pageSize)
+	c.Assert(err, IsNil)
+	c.Assert(got, DeepEquals, want)
+}
+
+func (s *ClientSuite) TestGetFeedPathInvalidDirection(c *C) {
+	streamName := "foostream"
+	direction := "somethingwrong"
+	version := -1
+	pageSize := 20
+
+	want := ""
+
+	got, err := client.GetFeedPath(streamName, direction, version, pageSize)
+	c.Assert(err, NotNil)
+	c.Assert(got, DeepEquals, want)
+	c.Assert(err, DeepEquals, fmt.Errorf("Invalid Direction %s. Allowed values are \"forward\" or \"backward\" \n", direction))
+}
+
+func (s *ClientSuite) TestGetFeedPathInvalidDirectionAndVersion(c *C) {
+	streamName := "foostream"
+	direction := "forward"
+	version := -1
+	pageSize := 20
+
+	want := ""
+
+	got, err := client.GetFeedPath(streamName, direction, version, pageSize)
+	c.Assert(err, NotNil)
+	c.Assert(got, DeepEquals, want)
+	c.Assert(err, DeepEquals, fmt.Errorf("Invalid Direction (%s) and version (head) combination.\n", direction))
 }

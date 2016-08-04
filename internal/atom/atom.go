@@ -3,6 +3,7 @@ package atom
 
 import (
 	"encoding/xml"
+	"strings"
 	"time"
 )
 
@@ -40,6 +41,16 @@ func (f *Feed) PrettyPrint() string {
 		panic(err)
 	}
 	return string(b)
+}
+
+// GetEventURLs extracts a slice of event urls from the feed object.
+func (f *Feed) GetEventURLs() ([]string, error) {
+	s := make([]string, len(f.Entry))
+	for i := 0; i < len(f.Entry); i++ {
+		e := f.Entry[i]
+		s[i] = strings.TrimRight(e.Link[1].Href, "/")
+	}
+	return s, nil
 }
 
 // Entry represents a feed entry.

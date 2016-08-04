@@ -1,7 +1,7 @@
 // Copyright 2016 Jet Basrawi. All rights reserved.
 //
 // Use of this source code is governed by a permissive BSD 3 Clause License
-// license that can be found in the LICENSE file.
+// that can be found in the license file.
 
 package goes
 
@@ -15,7 +15,6 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
-	"strings"
 
 	"github.com/jetbasrawi/go.geteventstore/internal/atom"
 )
@@ -115,7 +114,6 @@ func NewClient(httpClient *http.Client, serverURL string) (*Client, error) {
 		baseURL: baseURL,
 		headers: make(map[string]string),
 	}
-
 	return c, nil
 }
 
@@ -237,38 +235,33 @@ func (c *Client) ReadFeed(url string) (*atom.Feed, *Response, error) {
 	return feed, resp, nil
 }
 
-// GetFeedURL a URL for a stream atom feed page.
+// GetFeedPath returns the path for a feedpage
 //
-// If version and direction are nil or empty, the url returned will be
-// to read from the head of the stream backward.
-func GetFeedURL(stream, direction string, version int, pageSize int) (string, error) {
-
-	//TODO: Validate stream argumemt to ensure that it contains only url safe characters
-
+// Valid directions are "forward" and "backward".
+//
+// To get the path to the head of the stream, pass a negative integer in the version
+// argument and "backward" as the direction.
+func (c *Client) GetFeedPath(stream, direction string, version int, pageSize int) (string, error) {
 	ps := pageSize
 
 	dir := ""
 	switch direction {
-	case "":
-		if version == 0 {
-			dir = "forward"
-		} else {
-			dir = "backward"
-		}
-
 	case "forward", "backward":
 		dir = direction
 	default:
-		return "", fmt.Errorf("Invalid Direction %s\n", direction)
+		return "", fmt.Errorf("Invalid Direction %s. Allowed values are \"forward\" or \"backward\" \n", direction)
 	}
 
-	ver := "head"
-	if version < 0 {
-		return "", errInvalidVersion(version)
+	v := "head"
+	if version >= 0 {
+		v = strconv.Itoa(version)
 	}
-	ver = strconv.Itoa(version)
 
-	return fmt.Sprintf("/streams/%s/%s/%s/%d", stream, ver, dir, ps), nil
+	if v == "head" && dir == "forward" {
+		return "", fmt.Errorf("Invalid Direction (%s) and version (head) combination.\n", direction)
+	}
+
+	return fmt.Sprintf("/streams/%s/%s/%s/%d", stream, v, dir, ps), nil
 }
 
 // GetMetadataURL gets the url for the stream metadata.
@@ -278,7 +271,7 @@ func GetFeedURL(stream, direction string, version int, pageSize int) (string, er
 // http://docs.geteventstore.com/http-api/3.7.0/stream-metadata/
 func (c *Client) GetMetadataURL(stream string) (string, *Response, error) {
 
-	url, err := GetFeedURL(stream, "forward", 0, 1)
+	url, err := c.GetFeedPath(stream, "forward", 0, 1)
 	if err != nil {
 		return "", nil, err
 	}
@@ -477,16 +470,6 @@ func unmarshalFeed(r io.Reader) (*atom.Feed, error) {
 		return nil, err
 	}
 	return f, nil
-}
-
-// getEventURLs extracts a slice of event urls from the feed object.
-func getEventURLs(f *atom.Feed) ([]string, error) {
-	s := make([]string, len(f.Entry))
-	for i := 0; i < len(f.Entry); i++ {
-		e := f.Entry[i]
-		s[i] = strings.TrimRight(e.Link[1].Href, "/")
-	}
-	return s, nil
 }
 
 // newResponse creates a new Response for the provided http.Response.

@@ -1,3 +1,8 @@
+// Copyright 2016 Jet Basrawi. All rights reserved.
+//
+// Use of this source code is governed by a permissive BSD 3 Clause License
+// that can be found in the license file.
+
 package goes
 
 import (

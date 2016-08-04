@@ -33,7 +33,6 @@ Go.GetEventStore does not depend on any imported packages outside of the Go stan
     import "github.com/jetbasrawi/go.geteventstore"
 ```
 
-
 ###Create a new client
 
 ```go
@@ -165,7 +164,8 @@ Example code for deleting streams can be found in the examples directory.
 ###Direct use of the client
 
 The StreamReader and StreamWriter types are the easiest way to read and write events. If you would like to implement
-some other logic around reading events, some methods are available on the Client type.
+some other logic around reading events, some methods are available on the Client type. An example is included 
+demonstrating how to use some of these methods.
 
 ###Setting Optional Headers 
 Most of the optional headers are are included implicitly such as ES-LongPoll, ES-ExpectedVersion & ES-HardDelete when 

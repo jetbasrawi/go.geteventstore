@@ -1,3 +1,8 @@
+// Copyright 2016 Jet Basrawi. All rights reserved.
+//
+// Use of this source code is governed by a permissive BSD 3 Clause License
+// that can be found in the license file.
+
 package goes
 
 import (
@@ -71,7 +76,7 @@ func (s *StreamReader) Next() bool {
 	// version number.
 	if s.feedPage == nil {
 		s.index = -1
-		url, err := GetFeedURL(s.streamName, "forward", s.nextVersion, s.pageSize)
+		url, err := s.client.GetFeedPath(s.streamName, "forward", s.nextVersion, s.pageSize)
 		if err != nil {
 			s.lasterr = err
 			return false
