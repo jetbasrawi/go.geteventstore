@@ -8,16 +8,16 @@ for reading and writing of events and event metadata.
 ###Supported Features
 | Feature | Description |
 |---------|-------------|
-| Write Events & Event Metadata | Writing single and multiple events to a stream. Optionally expected version can be provided if you want to use optimistic concurrency features of the eventstore. |
-| Read Events & Event Metadata | Reading events & event metadata from a stream. |
-| Read & Write Stream Metadata | Read and writing stream metadata. |
-| Basic Authentication | |
-| Long Poll | Long Poll allows the client to listen at the head of a stream for new events. |
-| Soft & Hard Delete Stream | |
-| Catch Up Subsription | Using long poll with a StreamReader provides an effective catch up subscription. |
-| Serialization & Deserialization of Events | The package handles serialization and deserialization of your application events to and from the eventstore. |
-| Reading Stream Atom Feed | The package provides methods for reading stream Atom feed pages, returning a fully typed struct representation. |
-| Setting Optional Headers | Optional headers can be added and removed. |
+| **Write Events & Event Metadata** | Writing single and multiple events to a stream. Optionally expected version can be provided if you want to use optimistic concurrency features of the eventstore. |
+| **Read Events & Event Metadata** | Reading events & event metadata from a stream. |
+| **Read & Write Stream Metadata** | Read and writing stream metadata. |
+| **Basic Authentication** | |
+| **Long Poll** | Long Poll allows the client to listen at the head of a stream for new events. |
+| **Soft & Hard Delete Stream** | |
+| **Catch Up Subsription** | Using long poll with a StreamReader provides an effective catch up subscription. |
+| **Serialization & Deserialization of Events** | The package handles serialization and deserialization of your application events to and from the eventstore. |
+| **Reading Stream Atom Feed** | The package provides methods for reading stream Atom feed pages, returning a fully typed struct representation. |
+| **Setting Optional Headers** | Optional headers can be added and removed. |
 
 Below are some code examples giving a summary view of how the client works. To learn to use 
 the client in more detail, heavily commented example code can be found in the examples directory.
