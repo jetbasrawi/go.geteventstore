@@ -116,17 +116,17 @@ events can be found in the longpoll example.
 
 ```go 
 
-    // Create a new goes.StreamReader
     reader := client.NewStreamReader("FooStream")
-
-    // Call Next to get the next event
     for reader.Next() {
 
         // Check if the call resulted in an error. 
         if reader.Err() != nil {
-            **if e, ok := reader.Err().(*goes.NoMoreEvents); ok {
+            // When there are no more event in the stream, set LongPoll. 
+            // The server will wait for 15 seconds in this case or until
+            // events become available on the stream.
+            if e, ok := reader.Err().(*goes.NoMoreEvents); ok {
                 reader.LongPoll(15)
-            }**
+            }
         } else {
 
         fooEvent := FooEvent{}
