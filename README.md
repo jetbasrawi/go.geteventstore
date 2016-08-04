@@ -112,6 +112,31 @@ events can be found in the longpoll example.
 
 ```
 
+###Polling Head of Stream
+
+```go 
+
+    // Create a new goes.StreamReader
+    reader := client.NewStreamReader("FooStream")
+
+    // Call Next to get the next event
+    for reader.Next() {
+
+        // Check if the call resulted in an error. 
+        if reader.Err() != nil {
+            **if e, ok := reader.Err().(*goes.NoMoreEvents); ok {
+                reader.LongPoll(15)
+            }**
+        } else {
+
+        fooEvent := FooEvent{}
+        _ := reader.Scan(&fooEvent, &fooMeta)
+        
+        }
+    }
+
+```
+
 ###Deleting Streams
 
 The client supports both soft delete and hard delete of event streams. 
