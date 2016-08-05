@@ -14,7 +14,7 @@ for reading and writing of events and event metadata.
 | **Basic Authentication** | |
 | **Long Poll** | Long Poll allows the client to listen at the head of a stream for new events. |
 | **Soft & Hard Delete Stream** | |
-| **Catch Up Subsription** | Using long poll with a StreamReader provides an effective catch up subscription. |
+| **Catch Up Subscription** | Using long poll with a StreamReader provides an effective catch up subscription. |
 | **Serialization & Deserialization of Events** | The package handles serialization and deserialization of your application events to and from the eventstore. |
 | **Reading Stream Atom Feed** | The package provides methods for reading stream Atom feed pages, returning a fully typed struct representation. |
 | **Setting Optional Headers** | Optional headers can be added and removed. |
