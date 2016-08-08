@@ -32,7 +32,7 @@ type StreamWriter struct {
 // 0 : The stream should exist but it should be empty.
 func (s *StreamWriter) Append(expectedVersion *int, events ...*Event) error {
 	u := fmt.Sprintf("/streams/%s", s.streamName)
-	req, err := s.client.newRequest(http.MethodPost, u, events)
+	req, err := s.client.NewRequest(http.MethodPost, u, events)
 	if err != nil {
 		return err
 	}
@@ -42,7 +42,7 @@ func (s *StreamWriter) Append(expectedVersion *int, events ...*Event) error {
 		req.Header.Set("ES-ExpectedVersion", strconv.Itoa(*expectedVersion))
 	}
 
-	_, err = s.client.do(req, nil)
+	_, err = s.client.Do(req, nil)
 	if err != nil {
 		if e, ok := err.(*ErrBadRequest); ok {
 			return &ErrConcurrencyViolation{ErrorResponse: e.ErrorResponse}
@@ -74,14 +74,14 @@ func (s *StreamWriter) WriteMetaData(stream string, metadata interface{}) error 
 	if err != nil {
 		return err
 	}
-	req, err := s.client.newRequest(http.MethodPost, mURL, m)
+	req, err := s.client.NewRequest(http.MethodPost, mURL, m)
 	if err != nil {
 		return err
 	}
 
 	req.Header.Set("Content-Type", "application/vnd.eventstore.events+json")
 
-	_, err = s.client.do(req, nil)
+	_, err = s.client.Do(req, nil)
 	if err != nil {
 		return err
 	}

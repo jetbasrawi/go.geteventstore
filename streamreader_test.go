@@ -3,14 +3,17 @@
 // Use of this source code is governed by a permissive BSD 3 Clause License
 // that can be found in the license file.
 
-package goes
+package goes_test
 
 import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
 	"net/http"
+	"reflect"
 
+	"github.com/jetbasrawi/go.geteventstore"
+	"github.com/jetbasrawi/go.geteventstore.testfeed"
 	. "gopkg.in/check.v1"
 )
 
@@ -37,7 +40,7 @@ type FooEvent struct {
 func (s *StreamReaderSuite) TestNextMovesForwardOneEvent(c *C) {
 	streamName := "SomeStream"
 	ne := 10
-	es := CreateTestEvents(ne, streamName, server.URL, "EventTypeX")
+	es := mock.CreateTestEvents(ne, streamName, server.URL, "EventTypeX")
 
 	var ev *FooEvent
 	for _, v := range es {
@@ -78,7 +81,7 @@ func (s *StreamReaderSuite) TestNextReturnsErrorIfStreamDoesNotExist(c *C) {
 	stream := client.NewStreamReader("Something")
 	ok := stream.Next()
 	c.Assert(ok, Equals, true)
-	c.Assert(typeOf(stream.Err()), DeepEquals, "ErrNotFound")
+	c.Assert(reflect.TypeOf(stream.Err()).Elem().Name(), DeepEquals, "ErrNotFound")
 }
 
 // Tests that the stream returns appropriate error when the request results in
@@ -92,7 +95,7 @@ func (s *StreamReaderSuite) TestNextErrorsIfNotAuthorisedToAccessStream(c *C) {
 	stream := client.NewStreamReader("Something")
 	ok := stream.Next()
 	c.Assert(ok, Equals, true)
-	c.Assert(typeOf(stream.Err()), DeepEquals, "ErrUnauthorized")
+	c.Assert(reflect.TypeOf(stream.Err()).Elem().Name(), DeepEquals, "ErrUnauthorized")
 }
 
 // Testing the case where next has reached the end of the stream and there are
@@ -101,7 +104,7 @@ func (s *StreamReaderSuite) TestNextErrorsIfNotAuthorisedToAccessStream(c *C) {
 func (s *StreamReaderSuite) TestNextAtHeadOfStreamReturnsTrueWithNoEvent(c *C) {
 	streamName := "SomeStream"
 	ne := 1
-	es := CreateTestEvents(ne, streamName, server.URL, "EventTypeX")
+	es := mock.CreateTestEvents(ne, streamName, server.URL, "EventTypeX")
 	setupSimulator(es, nil)
 
 	stream := client.NewStreamReader(streamName)
@@ -119,9 +122,9 @@ func (s *StreamReaderSuite) TestNextAtHeadOfStreamReturnsTrueWithNoEvent(c *C) {
 func (s *StreamReaderSuite) TestReturnsErrorIfThereIsNoNextEventToReturn(c *C) {
 	streamName := "SomeStream"
 	ne := 1
-	es := CreateTestEvents(ne, streamName, server.URL, "FooEvent")
+	es := mock.CreateTestEvents(ne, streamName, server.URL, "FooEvent")
 	setupSimulator(es, nil)
-	want := &ErrNoMoreEvents{}
+	want := &goes.ErrNoMoreEvents{}
 
 	stream := client.NewStreamReader(streamName)
 	_ = stream.Next()
@@ -135,7 +138,7 @@ func (s *StreamReaderSuite) TestReturnsErrorIfThereIsNoNextEventToReturn(c *C) {
 func (s *StreamReaderSuite) TestScanEventData(c *C) {
 	streamName := "SomeStream"
 	ne := 1
-	es := CreateTestEvents(ne, streamName, server.URL, "FooEvent")
+	es := mock.CreateTestEvents(ne, streamName, server.URL, "FooEvent")
 
 	setupSimulator(es, nil)
 
@@ -157,7 +160,7 @@ func (s *StreamReaderSuite) TestScanEventData(c *C) {
 func (s *StreamReaderSuite) TestScanMetaData(c *C) {
 	streamName := "SomeStream"
 	ne := 1
-	es := CreateTestEvents(ne, streamName, server.URL, "FooEvent")
+	es := mock.CreateTestEvents(ne, streamName, server.URL, "FooEvent")
 
 	setupSimulator(es, nil)
 
@@ -179,7 +182,7 @@ func (s *StreamReaderSuite) TestScanMetaData(c *C) {
 func (s *StreamReaderSuite) TestSetStreamVersion(c *C) {
 	streamName := "FooStream"
 	ne := 25
-	es := CreateTestEvents(ne, streamName, server.URL, "FooEvent")
+	es := mock.CreateTestEvents(ne, streamName, server.URL, "FooEvent")
 
 	setupSimulator(es, nil)
 
@@ -195,18 +198,19 @@ func (s *StreamReaderSuite) TestSetStreamVersion(c *C) {
 func (s *StreamReaderSuite) TestFeedWithFewerEntriesThanThePageSize(c *C) {
 	streamName := "SomeStream"
 	ne := 25
-	es := CreateTestEvents(ne, streamName, server.URL, "FooEvent")
+	es := mock.CreateTestEvents(ne, streamName, server.URL, "FooEvent")
 
 	setupSimulator(es, nil)
 
 	stream := client.NewStreamReader(streamName)
 	count := 0
 	for stream.Next() {
-		switch err := stream.Err().(type) {
-		case *ErrNoMoreEvents:
-			c.Assert(err, NotNil)
+		switch e := stream.Err().(type) {
+		case *goes.ErrNoMoreEvents:
+			c.Assert(e, NotNil)
 			c.Assert(count, Equals, ne)
 			return
+
 		}
 		c.Assert(stream.EventResponse(), NotNil)
 		c.Assert(stream.Version(), Equals, count)
@@ -240,7 +244,7 @@ func (s *StreamReaderSuite) TestLongPollZero(c *C) {
 
 func (s *StreamReaderSuite) TestGetMetaReturnsNilWhenStreamMetaDataIsEmpty(c *C) {
 	stream := "Some-Stream"
-	es := CreateTestEvents(10, stream, server.URL, "EventTypeX")
+	es := mock.CreateTestEvents(10, stream, server.URL, "EventTypeX")
 	setupSimulator(es, nil)
 
 	streamReader := client.NewStreamReader(stream)
@@ -254,9 +258,9 @@ func (s *StreamReaderSuite) TestGetMetaData(c *C) {
 	d := fmt.Sprintf("{ \"foo\" : %d }", rand.Intn(9999))
 	raw := json.RawMessage(d)
 	stream := "Some-Stream"
-	es := CreateTestEvents(10, stream, server.URL, "EventTypeX")
-	m := CreateTestEvent(stream, server.URL, "metadata", 10, &raw, nil)
-	want := CreateTestEventResponse(m, nil)
+	es := mock.CreateTestEvents(10, stream, server.URL, "EventTypeX")
+	m := mock.CreateTestEvent(stream, server.URL, "metadata", 10, &raw, nil)
+	want := mock.CreateTestEventResponse(m, nil)
 	setupSimulator(es, m)
 
 	reader := client.NewStreamReader(stream)
@@ -272,7 +276,7 @@ func (s *StreamReaderSuite) TestGetMetaDataReturnsErrUnauthorizedWhenGettingMeta
 	})
 	reader := client.NewStreamReader("SomeStream")
 	m, err := reader.MetaData()
-	c.Assert(typeOf(err), Equals, "ErrUnauthorized")
+	c.Assert(reflect.TypeOf(err).Elem().Name(), Equals, "ErrUnauthorized")
 	c.Assert(m, IsNil)
 }
 
@@ -283,7 +287,7 @@ func (s *StreamReaderSuite) TestGetMetaDataReturnsErrNotFoundWhenGettingMetaURL(
 	})
 	reader := client.NewStreamReader("SomeStream")
 	m, err := reader.MetaData()
-	c.Assert(typeOf(err), Equals, "ErrNotFound")
+	c.Assert(reflect.TypeOf(err).Elem().Name(), Equals, "ErrNotFound")
 	c.Assert(m, IsNil)
 }
 
@@ -294,7 +298,7 @@ func (s *StreamReaderSuite) TestGetMetaDataReturnsErrTemporarilyUnavailableWhenG
 	})
 	reader := client.NewStreamReader("SomeStream")
 	m, err := reader.MetaData()
-	c.Assert(typeOf(err), Equals, "ErrTemporarilyUnavailable")
+	c.Assert(reflect.TypeOf(err).Elem().Name(), Equals, "ErrTemporarilyUnavailable")
 	c.Assert(m, IsNil)
 }
 
@@ -302,9 +306,9 @@ func (s *StreamReaderSuite) TestGetMetaDataReturnsErrUnauthorizedWhenGettingEven
 	stream := "SomeStream"
 	path := fmt.Sprintf("/streams/%s", stream)
 	feedURL := fmt.Sprintf("%s%s", server.URL, path)
-	es := CreateTestEvents(1, stream, server.URL, "EventTypeX")
+	es := mock.CreateTestEvents(1, stream, server.URL, "EventTypeX")
 
-	f, _ := CreateTestFeed(es, feedURL)
+	f, _ := mock.CreateTestFeed(es, feedURL)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.String() == path+"/0/forward/1" {
 			fmt.Fprintf(w, f.PrettyPrint())
@@ -315,7 +319,7 @@ func (s *StreamReaderSuite) TestGetMetaDataReturnsErrUnauthorizedWhenGettingEven
 	})
 	reader := client.NewStreamReader("SomeStream")
 	m, err := reader.MetaData()
-	c.Assert(typeOf(err), Equals, "ErrUnauthorized")
+	c.Assert(reflect.TypeOf(err).Elem().Name(), Equals, "ErrUnauthorized")
 	c.Assert(m, IsNil)
 }
 
@@ -323,9 +327,9 @@ func (s *StreamReaderSuite) TestGetMetaDataReturnsErrNotFoundWhenGettingEvent(c 
 	stream := "SomeStream"
 	path := fmt.Sprintf("/streams/%s", stream)
 	feedURL := fmt.Sprintf("%s%s", server.URL, path)
-	es := CreateTestEvents(1, stream, server.URL, "EventTypeX")
+	es := mock.CreateTestEvents(1, stream, server.URL, "EventTypeX")
 
-	f, _ := CreateTestFeed(es, feedURL)
+	f, _ := mock.CreateTestFeed(es, feedURL)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.String() == path+"/0/forward/1" {
 			fmt.Fprintf(w, f.PrettyPrint())
@@ -336,7 +340,7 @@ func (s *StreamReaderSuite) TestGetMetaDataReturnsErrNotFoundWhenGettingEvent(c 
 	})
 	reader := client.NewStreamReader("SomeStream")
 	m, err := reader.MetaData()
-	c.Assert(typeOf(err), Equals, "ErrNotFound")
+	c.Assert(reflect.TypeOf(err).Elem().Name(), Equals, "ErrNotFound")
 	c.Assert(m, IsNil)
 }
 
@@ -344,9 +348,9 @@ func (s *StreamReaderSuite) TestGetMetaDataReturnsErrTemporarilyUnavailableWhenG
 	stream := "SomeStream"
 	path := fmt.Sprintf("/streams/%s", stream)
 	feedURL := fmt.Sprintf("%s%s", server.URL, path)
-	es := CreateTestEvents(1, stream, server.URL, "EventTypeX")
+	es := mock.CreateTestEvents(1, stream, server.URL, "EventTypeX")
 
-	f, _ := CreateTestFeed(es, feedURL)
+	f, _ := mock.CreateTestFeed(es, feedURL)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.String() == path+"/0/forward/1" {
 			fmt.Fprintf(w, f.PrettyPrint())
@@ -357,6 +361,6 @@ func (s *StreamReaderSuite) TestGetMetaDataReturnsErrTemporarilyUnavailableWhenG
 	})
 	reader := client.NewStreamReader("SomeStream")
 	m, err := reader.MetaData()
-	c.Assert(typeOf(err), Equals, "ErrTemporarilyUnavailable")
+	c.Assert(reflect.TypeOf(err).Elem().Name(), Equals, "ErrTemporarilyUnavailable")
 	c.Assert(m, IsNil)
 }

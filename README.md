@@ -1,11 +1,11 @@
 #Go.GetEventStore [![license](https://img.shields.io/badge/license-BSD-blue.svg?maxAge=2592000)](https://github.com/jetbasrawi/go.geteventstore/blob/master/LICENSE.md) [![Go Report Card](https://goreportcard.com/badge/github.com/jetbasrawi/go.geteventstore)](https://goreportcard.com/report/github.com/jetbasrawi/go.geteventstore) [![GoDoc](https://godoc.org/github.com/jetbasrawi/go.geteventstore?status.svg)](https://godoc.org/github.com/jetbasrawi/go.geteventstore)
 
-##A Golang client for the GetEventStore 3.x HTTP API. 
+##A Golang client for EventStore 3.x HTTP API. 
 Go.GetEventStore is a http client for [GetEventStore](https://geteventstore.com) written in Go. The 
 client abstracts interaction with the GetEventStore HTTP API providing easy to use features 
 for reading and writing of events and event metadata.
 
-###Supported Features
+###Supported features
 | Feature | Description |
 |---------|-------------|
 | **Write Events & Event Metadata** | Writing single and multiple events to a stream. Optionally expected version can be provided if you want to use optimistic concurrency features of the eventstore. |
@@ -14,7 +14,7 @@ for reading and writing of events and event metadata.
 | **Basic Authentication** | |
 | **Long Poll** | Long Poll allows the client to listen at the head of a stream for new events. |
 | **Soft & Hard Delete Stream** | |
-| **Catch Up Subsription** | Using long poll with a StreamReader provides an effective catch up subscription. |
+| **Catch Up Subscription** | Using long poll with a StreamReader provides an effective catch up subscription. |
 | **Serialization & Deserialization of Events** | The package handles serialization and deserialization of your application events to and from the eventstore. |
 | **Reading Stream Atom Feed** | The package provides methods for reading stream Atom feed pages, returning a fully typed struct representation. |
 | **Setting Optional Headers** | Optional headers can be added and removed. |
@@ -26,7 +26,6 @@ the client in more detail, heavily commented example code can be found in the ex
 ```
     $ go get github.com/jetbasrawi/go.geteventstore"
 ```
-Go.GetEventStore does not depend on any imported packages outside of the Go standard packages. 
 
 ###Import the package
 ```go 
@@ -43,7 +42,7 @@ Go.GetEventStore does not depend on any imported packages outside of the Go stan
 
 ```
 
-###Set Authentication
+###Set basic authentication
 
 If required, you can set authentication on the client. Credentials can be changed at any time.
 Requests are made with the credentials that were set last or none if none are set.
@@ -54,7 +53,7 @@ Requests are made with the credentials that were set last or none if none are se
 
 ```
 
-###Write Events and Event Metadata
+###Write events and event Metadata
 
 Writing events and event metadata are supported via the StreamWriter. 
 
@@ -86,7 +85,7 @@ Writing events and event metadata are supported via the StreamWriter.
 
 ```
 
-###Read Events
+###Read events
 
 Reading events using the goes.StreamReader loosely follows the iterator idiom used in 
 the "database/sql" package and other go libraries that deal with databases. This idiom 
@@ -122,9 +121,11 @@ events can be found in the longpoll example.
 
 ```
 
-###Polling Head of Stream
+###Long polling head of a stream
 
-LongPoll provides an easy and efficient way to poll a stream listening for new events.
+LongPoll provides an easy and efficient way to poll a stream listening for new events. 
+The server will wait the specified amount of time or until new events are available on 
+a stream. 
 
 ```go 
 
@@ -134,7 +135,7 @@ LongPoll provides an easy and efficient way to poll a stream listening for new e
             // When there are no more event in the stream, set LongPoll. 
             // The server will wait for 15 seconds in this case or until
             // events become available on the stream.
-            if e, ok := reader.Err().(*goes.NoMoreEvents); ok {
+            if e, ok := reader.Err().(*goes.ErrNoMoreEvents); ok {
                 reader.LongPoll(15)
             }
         } else {
@@ -147,7 +148,7 @@ LongPoll provides an easy and efficient way to poll a stream listening for new e
 
 A more detailed example of using LongPoll can be found in the examples directory.
 
-###Deleting Streams
+###Deleting streams
 
 The client supports both soft delete and hard delete of event streams. 
 
@@ -167,7 +168,7 @@ The StreamReader and StreamWriter types are the easiest way to read and write ev
 some other logic around reading events, some methods are available on the Client type. An example is included 
 demonstrating how to use some of these methods.
 
-###Setting Optional Headers 
+###Setting optional headers 
 Most of the optional headers are are included implicitly such as ES-LongPoll, ES-ExpectedVersion & ES-HardDelete when 
 using LongPoll on the StreamReader or when appending events or deleting streams. However should you wish to use
 any of the others the can be set explicitly on the client. The only other ones you might want to use are ES-ResolveLinkTo, 

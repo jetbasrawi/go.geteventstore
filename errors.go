@@ -5,14 +5,6 @@
 
 package goes
 
-import "fmt"
-
-type errInvalidVersion int
-
-func (i errInvalidVersion) Error() string {
-	return fmt.Sprintf("%d is not a valid event number", i)
-}
-
 // ErrNoMoreEvents is returned when there are no events to return
 // from a request to a stream.
 type ErrNoMoreEvents struct{}

@@ -16,7 +16,7 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/jetbasrawi/go.geteventstore/internal/atom"
+	"github.com/jetbasrawi/go.geteventstore/atom"
 )
 
 // Response encapsulates HTTP responses from the server.
@@ -155,7 +155,7 @@ func (c *Client) SetBasicAuth(username, password string) {
 // and a description of the error.
 func (c *Client) GetEvent(url string) (*EventResponse, *Response, error) {
 
-	r, err := c.newRequest("GET", url, nil)
+	r, err := c.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -163,7 +163,7 @@ func (c *Client) GetEvent(url string) (*EventResponse, *Response, error) {
 	r.Header.Set("Accept", "application/vnd.eventstore.atom+json")
 
 	var b bytes.Buffer
-	resp, err := c.do(r, &b)
+	resp, err := c.Do(r, &b)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -172,7 +172,7 @@ func (c *Client) GetEvent(url string) (*EventResponse, *Response, error) {
 		return nil, resp, nil
 	}
 	var raw json.RawMessage
-	er := &eventAtomResponse{Content: &raw}
+	er := &EventAtomResponse{Content: &raw}
 	err = json.NewDecoder(bytes.NewReader(b.Bytes())).Decode(er)
 	if err == io.EOF {
 		return nil, resp, nil
@@ -214,7 +214,7 @@ func (c *Client) GetEvent(url string) (*EventResponse, *Response, error) {
 // and this will also contain the raw http request and status and an error message.
 func (c *Client) ReadFeed(url string) (*atom.Feed, *Response, error) {
 
-	req, err := c.newRequest("GET", url, nil)
+	req, err := c.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -222,12 +222,12 @@ func (c *Client) ReadFeed(url string) (*atom.Feed, *Response, error) {
 	req.Header.Set("Accept", "application/atom+xml")
 
 	var b bytes.Buffer
-	resp, err := c.do(req, &b)
+	resp, err := c.Do(req, &b)
 	if err != nil {
 		return nil, resp, err
 	}
-
-	feed, err := unmarshalFeed(bytes.NewReader(b.Bytes()))
+	feed := &atom.Feed{}
+	err = xml.NewDecoder(bytes.NewReader(b.Bytes())).Decode(feed)
 	if err != nil {
 		return nil, resp, err
 	}
@@ -315,7 +315,7 @@ func (c *Client) DeleteStream(streamName string, hardDelete bool) (*Response, er
 
 	url := fmt.Sprintf("/streams/%s", streamName)
 
-	req, err := c.newRequest(http.MethodDelete, url, nil)
+	req, err := c.NewRequest(http.MethodDelete, url, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -324,7 +324,7 @@ func (c *Client) DeleteStream(streamName string, hardDelete bool) (*Response, er
 		req.Header.Set("ES-HardDelete", "true")
 	}
 
-	resp, err := c.do(req, nil)
+	resp, err := c.Do(req, nil)
 	if err != nil {
 		return resp, err
 	}
@@ -333,8 +333,9 @@ func (c *Client) DeleteStream(streamName string, hardDelete bool) (*Response, er
 
 }
 
-// newRequest creates a new *http.Request that can be used to execute requests to the server
-func (c *Client) newRequest(method, urlString string, body interface{}) (*http.Request, error) {
+// NewRequest creates a new *http.Request that can be used to execute requests to the
+// server using the client.
+func (c *Client) NewRequest(method, urlString string, body interface{}) (*http.Request, error) {
 
 	url, err := url.Parse(urlString)
 	if err != nil {
@@ -370,13 +371,13 @@ func (c *Client) newRequest(method, urlString string, body interface{}) (*http.R
 	return req, nil
 }
 
-// do executes requests to the server.
+// Do executes requests to the server.
 //
 // The response body is copied into v if v is not nil.
 // Returns a *Response that wraps the http.Response returned from the server.
 // The response body is available in the *Response in case the consumer wishes
 // to process it in some way rather than read if from the argument v
-func (c *Client) do(req *http.Request, v io.Writer) (*Response, error) {
+func (c *Client) Do(req *http.Request, v io.Writer) (*Response, error) {
 
 	// keep is a copy of the request body that will be returned
 	// with the response for diagnostic purposes.
@@ -458,18 +459,6 @@ func getError(r *http.Response, req *http.Request) error {
 	default:
 		return &ErrUnexpected{ErrorResponse: errorResponse}
 	}
-}
-
-// unmarshalFeed decodes the io.Reader taken from the http response body and
-// returns an *atom.Feed object.
-// In case of an error, the returned Feed object will be nil.
-func unmarshalFeed(r io.Reader) (*atom.Feed, error) {
-	f := &atom.Feed{}
-	err := xml.NewDecoder(r).Decode(f)
-	if err != nil {
-		return nil, err
-	}
-	return f, nil
 }
 
 // newResponse creates a new Response for the provided http.Response.

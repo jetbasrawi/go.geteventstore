@@ -3,7 +3,7 @@
 // Use of this source code is governed by a permissive BSD 3 Clause License
 // that can be found in the license file.
 
-package goes
+package goes_test
 
 import (
 	"bytes"
@@ -11,8 +11,11 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"reflect"
 	"strconv"
 
+	"github.com/jetbasrawi/go.geteventstore"
+	"github.com/jetbasrawi/go.geteventstore.testfeed"
 	. "gopkg.in/check.v1"
 )
 
@@ -30,14 +33,14 @@ func (s *StreamWriterSuite) TearDownTest(c *C) {
 func (s *StreamWriterSuite) TestAppendEventsSingle(c *C) {
 	data := &MyDataType{Field1: 445, Field2: "Some string"}
 	et := "SomeEventType"
-	ev := NewEvent("", et, data, nil)
+	ev := goes.NewEvent("", et, data, nil)
 	streamName := "Some-Stream"
 	url := fmt.Sprintf("/streams/%s", streamName)
 	mux.HandleFunc(url, func(w http.ResponseWriter, r *http.Request) {
 		c.Assert(r.Method, Equals, "POST")
 
 		b, _ := ioutil.ReadAll(r.Body)
-		se := []Event{}
+		se := []goes.Event{}
 		err := json.NewDecoder(bytes.NewReader(b)).Decode(&se)
 		c.Assert(err, IsNil)
 		c.Assert(se[0].PrettyPrint(), Equals, ev.PrettyPrint())
@@ -60,8 +63,8 @@ func (s *StreamWriterSuite) TestAppendEventsMultiple(c *C) {
 	et := "SomeEventType"
 	d1 := &MyDataType{Field1: 445, Field2: "Some string"}
 	d2 := &MyDataType{Field1: 446, Field2: "Some other string"}
-	ev1 := NewEvent("", et, d1, nil)
-	ev2 := NewEvent("", et, d2, nil)
+	ev1 := goes.NewEvent("", et, d1, nil)
+	ev2 := goes.NewEvent("", et, d2, nil)
 
 	stream := "Some-Stream"
 	url := fmt.Sprintf("/streams/%s", stream)
@@ -70,7 +73,7 @@ func (s *StreamWriterSuite) TestAppendEventsMultiple(c *C) {
 		c.Assert(r.Method, Equals, "POST")
 
 		b, _ := ioutil.ReadAll(r.Body)
-		se := []Event{}
+		se := []goes.Event{}
 		err := json.NewDecoder(bytes.NewReader(b)).Decode(&se)
 		c.Assert(err, IsNil)
 		c.Assert(se[0].PrettyPrint(), Equals, ev1.PrettyPrint())
@@ -89,7 +92,7 @@ func (s *StreamWriterSuite) TestAppendEventsMultiple(c *C) {
 func (s *StreamWriterSuite) TestAppendEventsWithErrConcurrencyViolation(c *C) {
 	data := &MyDataType{Field1: 445, Field2: "Some string"}
 	et := "SomeEventType"
-	ev := NewEvent("", et, data, nil)
+	ev := goes.NewEvent("", et, data, nil)
 
 	stream := "Some-Stream"
 	url := fmt.Sprintf("/streams/%s", stream)
@@ -111,7 +114,7 @@ func (s *StreamWriterSuite) TestAppendEventsWithErrConcurrencyViolation(c *C) {
 	streamWriter := client.NewStreamWriter(stream)
 	err := streamWriter.Append(&expectedVersion, ev)
 	c.Assert(err, NotNil)
-	c.Assert(typeOf(err), DeepEquals, "ErrConcurrencyViolation")
+	c.Assert(reflect.TypeOf(err).Elem().Name(), DeepEquals, "ErrConcurrencyViolation")
 }
 
 func (s *StreamWriterSuite) TestAppendStreamMetadata(c *C) {
@@ -124,8 +127,8 @@ func (s *StreamWriterSuite) TestAppendStreamMetadata(c *C) {
 	path := fmt.Sprintf("/streams/%s/0/forward/1", stream)
 	fullURL := fmt.Sprintf("%s%s", server.URL, path)
 	mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
-		es := CreateTestEvents(1, stream, server.URL, eventType)
-		f, _ := CreateTestFeed(es, fullURL)
+		es := mock.CreateTestEvents(1, stream, server.URL, eventType)
+		f, _ := mock.CreateTestFeed(es, fullURL)
 		fmt.Fprint(w, f.PrettyPrint())
 	})
 
@@ -138,7 +141,7 @@ func (s *StreamWriterSuite) TestAppendStreamMetadata(c *C) {
 		c.Assert(r.Method, Equals, http.MethodPost)
 
 		var got json.RawMessage
-		ev := &Event{Data: &got}
+		ev := &goes.Event{Data: &got}
 		err := json.NewDecoder(r.Body).Decode(ev)
 		c.Assert(err, IsNil)
 		c.Assert(got, DeepEquals, want)
@@ -171,7 +174,7 @@ func (s *StreamWriterSuite) TestAppendStreamMetadataReturnsUnauthorisedWhenGetti
 	err := writer.WriteMetaData(stream, &want)
 
 	c.Assert(err, NotNil)
-	if e, ok := err.(*ErrUnauthorized); ok {
+	if e, ok := err.(*goes.ErrUnauthorized); ok {
 		c.Assert(e.ErrorResponse, NotNil)
 	} else {
 		c.Error("Error returned is not of type *ErrUnauthorized")
@@ -193,7 +196,7 @@ func (s *StreamWriterSuite) TestAppendStreamMetadataReturnsTemporarilyUnavailabl
 	err := writer.WriteMetaData(stream, &want)
 
 	c.Assert(err, NotNil)
-	if e, ok := err.(*ErrTemporarilyUnavailable); ok {
+	if e, ok := err.(*goes.ErrTemporarilyUnavailable); ok {
 		c.Assert(e.ErrorResponse, NotNil)
 	} else {
 		c.Error("Error returned is not of type *ErrTemporarilyUnavailable")
@@ -215,7 +218,7 @@ func (s *StreamWriterSuite) TestAppendStreamMetadataReturnsErrUnexpectedWhenGett
 	err := writer.WriteMetaData(stream, &want)
 
 	c.Assert(err, NotNil)
-	if e, ok := err.(*ErrUnexpected); ok {
+	if e, ok := err.(*goes.ErrUnexpected); ok {
 		c.Assert(e.ErrorResponse, NotNil)
 	} else {
 		c.Error("Error returned is not of type *ErrUnexpected")
@@ -232,8 +235,8 @@ func (s *StreamWriterSuite) TestAppendStreamMetadataReturnsErrUnexpectedWhenWrit
 	path := fmt.Sprintf("/streams/%s/0/forward/1", stream)
 	fullURL := fmt.Sprintf("%s%s", server.URL, path)
 	mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
-		es := CreateTestEvents(1, stream, server.URL, eventType)
-		f, _ := CreateTestFeed(es, fullURL)
+		es := mock.CreateTestEvents(1, stream, server.URL, eventType)
+		f, _ := mock.CreateTestFeed(es, fullURL)
 		fmt.Fprint(w, f.PrettyPrint())
 	})
 
@@ -252,7 +255,7 @@ func (s *StreamWriterSuite) TestAppendStreamMetadataReturnsErrUnexpectedWhenWrit
 	err := writer.WriteMetaData(stream, &want)
 
 	c.Assert(err, NotNil)
-	if e, ok := err.(*ErrUnexpected); ok {
+	if e, ok := err.(*goes.ErrUnexpected); ok {
 		c.Assert(e.ErrorResponse, NotNil)
 	} else {
 		c.Error("Error returned is not of type *ErrUnexpected")
@@ -269,8 +272,8 @@ func (s *StreamWriterSuite) TestAppendStreamMetadataReturnsErrUnauthorizedWhenWr
 	path := fmt.Sprintf("/streams/%s/0/forward/1", stream)
 	fullURL := fmt.Sprintf("%s%s", server.URL, path)
 	mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
-		es := CreateTestEvents(1, stream, server.URL, eventType)
-		f, _ := CreateTestFeed(es, fullURL)
+		es := mock.CreateTestEvents(1, stream, server.URL, eventType)
+		f, _ := mock.CreateTestFeed(es, fullURL)
 		fmt.Fprint(w, f.PrettyPrint())
 	})
 
@@ -289,7 +292,7 @@ func (s *StreamWriterSuite) TestAppendStreamMetadataReturnsErrUnauthorizedWhenWr
 	err := writer.WriteMetaData(stream, &want)
 
 	c.Assert(err, NotNil)
-	if e, ok := err.(*ErrUnauthorized); ok {
+	if e, ok := err.(*goes.ErrUnauthorized); ok {
 		c.Assert(e.ErrorResponse, NotNil)
 	} else {
 		c.Error("Error returned is not of type *ErrUnauthorized")
@@ -306,8 +309,8 @@ func (s *StreamWriterSuite) TestAppendStreamMetadataReturnsErrTemporarilyUnavail
 	path := fmt.Sprintf("/streams/%s/0/forward/1", stream)
 	fullURL := fmt.Sprintf("%s%s", server.URL, path)
 	mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
-		es := CreateTestEvents(1, stream, server.URL, eventType)
-		f, _ := CreateTestFeed(es, fullURL)
+		es := mock.CreateTestEvents(1, stream, server.URL, eventType)
+		f, _ := mock.CreateTestFeed(es, fullURL)
 		fmt.Fprint(w, f.PrettyPrint())
 	})
 
@@ -326,7 +329,7 @@ func (s *StreamWriterSuite) TestAppendStreamMetadataReturnsErrTemporarilyUnavail
 	err := writer.WriteMetaData(stream, &want)
 
 	c.Assert(err, NotNil)
-	if e, ok := err.(*ErrTemporarilyUnavailable); ok {
+	if e, ok := err.(*goes.ErrTemporarilyUnavailable); ok {
 		c.Assert(e.ErrorResponse, NotNil)
 	} else {
 		c.Error("Error returned is not of type *ErrTemporarilyUnavailable")

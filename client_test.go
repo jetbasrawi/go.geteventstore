@@ -3,7 +3,7 @@
 // Use of this source code is governed by a permissive BSD 3 Clause License
 // that can be found in the license file.
 
-package goes
+package goes_test
 
 import (
 	"encoding/base64"
@@ -11,41 +11,32 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"net/url"
 	"reflect"
-	"strings"
 	"time"
 
+	"github.com/jetbasrawi/go.geteventstore"
+	"github.com/jetbasrawi/go.geteventstore.testfeed"
 	. "gopkg.in/check.v1"
 )
 
-var _ = Suite(&ClientSuite{})
+var _ = Suite(&ClientAPISuite{})
 
-type ClientSuite struct{}
+type ClientAPISuite struct{}
 
-func (s *ClientSuite) SetUpTest(c *C) {
+func (s *ClientAPISuite) SetUpTest(c *C) {
 	setup()
 }
-func (s *ClientSuite) TearDownTest(c *C) {
+func (s *ClientAPISuite) TearDownTest(c *C) {
 	teardown()
 }
 
-func newTestClient() *Client {
-	baseURL, _ := url.Parse(server.URL)
-	return &Client{
-		client:  http.DefaultClient,
-		baseURL: baseURL,
-		headers: make(map[string]string),
-	}
-}
-
-func (s *ClientSuite) TestReadStream(c *C) {
+func (s *ClientAPISuite) TestReadStream(c *C) {
 	stream := "some-stream"
 	path := fmt.Sprintf("/streams/%s/head/backward/20", stream)
 	url := fmt.Sprintf("%s%s", server.URL, path)
 
-	es := CreateTestEvents(2, stream, server.URL, "EventTypeX")
-	f, _ := CreateTestFeed(es, url)
+	es := mock.CreateTestEvents(2, stream, server.URL, "EventTypeX")
+	f, _ := mock.CreateTestFeed(es, url)
 
 	mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
 		c.Assert(r.Method, Equals, "GET")
@@ -58,42 +49,18 @@ func (s *ClientSuite) TestReadStream(c *C) {
 	c.Assert(resp.StatusCode, DeepEquals, http.StatusOK)
 }
 
-func (s *ClientSuite) TestUnmarshalFeed(c *C) {
-	stream := "unmarshal-feed"
-	count := 2
-
-	es := CreateTestEvents(count, stream, server.URL, "EventTypeX")
-	url := fmt.Sprintf("%s/streams/%s/head/backward/%d", server.URL, stream, count)
-
-	wf, _ := CreateTestFeed(es, url)
-	want := wf.PrettyPrint()
-
-	gf, err := unmarshalFeed(strings.NewReader(want))
-	c.Assert(err, IsNil)
-	got := gf.PrettyPrint()
-
-	c.Assert(got, DeepEquals, want)
-}
-
-func (s *ClientSuite) TestConstructNewClient(c *C) {
-	ct, err := NewClient(nil, server.URL)
-	got, want := ct.baseURL.String(), server.URL
-	c.Assert(err, IsNil)
-	c.Assert(got, Equals, want)
-}
-
-func (s *ClientSuite) TestConstructNewClientInvalidURL(c *C) {
+func (s *ClientAPISuite) TestConstructNewClientInvalidURL(c *C) {
 	invalidURL := ":"
-	_, err := NewClient(nil, invalidURL)
+	_, err := goes.NewClient(nil, invalidURL)
 	c.Assert(err, ErrorMatches, "parse :: missing protocol scheme")
 }
 
-func (s *ClientSuite) TestNewRequest(c *C) {
+func (s *ClientAPISuite) TestNewRequest(c *C) {
 	reqURL, outURL := "/foo", server.URL+"/foo"
-	reqBody := &Event{EventID: "some-uuid", EventType: "SomeEventType", Data: "some-string"}
+	reqBody := &goes.Event{EventID: "some-uuid", EventType: "SomeEventType", Data: "some-string"}
 	eventStructJSON := `{"eventType":"SomeEventType","eventId":"some-uuid","data":"some-string"}`
 	outBody := eventStructJSON + "\n"
-	req, _ := client.newRequest("GET", reqURL, reqBody)
+	req, _ := client.NewRequest("GET", reqURL, reqBody)
 
 	// test that the relative url was concatenated
 	c.Assert(req.URL.String(), Equals, outURL)
@@ -103,7 +70,7 @@ func (s *ClientSuite) TestNewRequest(c *C) {
 	c.Assert(string(body), Equals, outBody)
 }
 
-func (s *ClientSuite) TestRequestsAreSentWithBasicAuthIfSet(c *C) {
+func (s *ClientAPISuite) TestRequestsAreSentWithBasicAuthIfSet(c *C) {
 	username := "user"
 	password := "pass"
 	headerStr := "Basic " + base64.StdEncoding.EncodeToString([]byte(username+":"+password))
@@ -121,19 +88,19 @@ func (s *ClientSuite) TestRequestsAreSentWithBasicAuthIfSet(c *C) {
 	c.Assert(authFound, Equals, true)
 }
 
-func (s *ClientSuite) TestNewRequestWithInvalidJSONReturnsError(c *C) {
+func (s *ClientAPISuite) TestNewRequestWithInvalidJSONReturnsError(c *C) {
 	type T struct {
 		A map[int]interface{}
 	}
 	ti := &T{}
-	_, err := client.newRequest(http.MethodGet, "/", ti)
+	_, err := client.NewRequest(http.MethodGet, "/", ti)
 	c.Assert(err, NotNil)
 	tp := reflect.TypeOf(ti.A)
 	c.Assert(err, FitsTypeOf, &json.UnsupportedTypeError{Type: tp})
 }
 
-func (s *ClientSuite) TestNewRequestWithBadURLReturnsError(c *C) {
-	_, err := client.newRequest(http.MethodGet, ":", nil)
+func (s *ClientAPISuite) TestNewRequestWithBadURLReturnsError(c *C) {
+	_, err := client.NewRequest(http.MethodGet, ":", nil)
 	c.Assert(err, ErrorMatches, "parse :: missing protocol scheme")
 }
 
@@ -143,15 +110,15 @@ func (s *ClientSuite) TestNewRequestWithBadURLReturnsError(c *C) {
 // body that is an empty string versus one that is not set at all.  However in
 // certain cases, intermediate systems may treat these differently resulting in
 // subtle errors.
-func (s *ClientSuite) TestNewRequestWithEmptyBody(c *C) {
-	req, err := client.newRequest(http.MethodGet, "/", nil)
+func (s *ClientAPISuite) TestNewRequestWithEmptyBody(c *C) {
+	req, err := client.NewRequest(http.MethodGet, "/", nil)
 	c.Assert(err, IsNil)
 	c.Assert(req.Body, IsNil)
 }
 
-func (s *ClientSuite) TestDo(c *C) {
+func (s *ClientAPISuite) TestDo(c *C) {
 
-	te := CreateTestEvents(1, "some-stream", "localhost:2113", "SomeEventType")
+	te := mock.CreateTestEvents(1, "some-stream", "localhost:2113", "SomeEventType")
 	body := te[0].Data
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -160,11 +127,11 @@ func (s *ClientSuite) TestDo(c *C) {
 		fmt.Fprint(w, body)
 	})
 
-	req, _ := client.newRequest(http.MethodPost, "/", nil)
-	resp, err := client.do(req, nil)
+	req, _ := client.NewRequest(http.MethodPost, "/", nil)
+	resp, err := client.Do(req, nil)
 	c.Assert(err, IsNil)
 
-	want := &Response{
+	want := &goes.Response{
 		Response:   resp.Response,
 		StatusCode: http.StatusCreated,
 		Status:     "201 Created"}
@@ -172,34 +139,34 @@ func (s *ClientSuite) TestDo(c *C) {
 	c.Assert(want, DeepEquals, resp)
 }
 
-func (s *ClientSuite) TestErrorResponseContainsCopyOfTheOriginalRequest(c *C) {
+func (s *ClientAPISuite) TestErrorResponseContainsCopyOfTheOriginalRequest(c *C) {
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprintf(w, "")
 	})
 
-	req, _ := client.newRequest(http.MethodPost, "/", "[{\"some_field\": 34534}]")
+	req, _ := client.NewRequest(http.MethodPost, "/", "[{\"some_field\": 34534}]")
 
-	_, err := client.do(req, nil)
+	_, err := client.Do(req, nil)
 
-	if e, ok := err.(*ErrBadRequest); ok {
+	if e, ok := err.(*goes.ErrBadRequest); ok {
 		c.Assert(e.ErrorResponse.Request, DeepEquals, req)
 	} else {
 		c.FailNow()
 	}
 }
 
-func (s *ClientSuite) TestErrorResponseContainsStatusCodeAndMessage(c *C) {
+func (s *ClientAPISuite) TestErrorResponseContainsStatusCodeAndMessage(c *C) {
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprintf(w, "Response Body")
 	})
 
-	req, _ := client.newRequest(http.MethodPost, "/", nil)
+	req, _ := client.NewRequest(http.MethodPost, "/", nil)
 
-	_, err := client.do(req, nil)
+	_, err := client.Do(req, nil)
 
-	if e, ok := err.(*ErrBadRequest); ok {
+	if e, ok := err.(*goes.ErrBadRequest); ok {
 		c.Assert(e.ErrorResponse.StatusCode, Equals, http.StatusBadRequest)
 		c.Assert(e.ErrorResponse.Status, Equals, "400 Bad Request")
 	} else {
@@ -207,27 +174,14 @@ func (s *ClientSuite) TestErrorResponseContainsStatusCodeAndMessage(c *C) {
 	}
 }
 
-func (s *ClientSuite) TestNewResponse(c *C) {
-
-	r := http.Response{
-		Status:     "201 Created",
-		StatusCode: http.StatusCreated,
-	}
-
-	resp := newResponse(&r)
-
-	c.Assert(resp.Status, Equals, "201 Created")
-	c.Assert(resp.StatusCode, Equals, http.StatusCreated)
-}
-
-func (s *ClientSuite) TestGetEvent(c *C) {
+func (s *ClientAPISuite) TestGetEvent(c *C) {
 	stream := "GetEventStream"
-	es := CreateTestEvents(1, stream, server.URL, "SomeEventType")
-	ti := Time(time.Now())
+	es := mock.CreateTestEvents(1, stream, server.URL, "SomeEventType")
+	ti := mock.Time(time.Now())
 
-	want := CreateTestEventResponse(es[0], &ti)
+	want := mock.CreateTestEventResponse(es[0], &ti)
 
-	er, _ := CreateTestEventAtomResponse(es[0], &ti)
+	er, _ := mock.CreateTestEventAtomResponse(es[0], &ti)
 	str := er.PrettyPrint()
 
 	mux.HandleFunc("/streams/some-stream/299", func(w http.ResponseWriter, r *http.Request) {
@@ -243,9 +197,9 @@ func (s *ClientSuite) TestGetEvent(c *C) {
 	c.Assert(got.PrettyPrint(), Equals, want.PrettyPrint())
 }
 
-func (s *ClientSuite) TestGetEventURLs(c *C) {
-	es := CreateTestEvents(2, "some-stream", "http://localhost:2113", "EventTypeX")
-	f, _ := CreateTestFeed(es, "http://localhost:2113/streams/some-stream/head/backward/2")
+func (s *ClientAPISuite) TestGetEventURLs(c *C) {
+	es := mock.CreateTestEvents(2, "some-stream", "http://localhost:2113", "EventTypeX")
+	f, _ := mock.CreateTestFeed(es, "http://localhost:2113/streams/some-stream/head/backward/2")
 
 	got, err := f.GetEventURLs()
 	c.Assert(err, IsNil)
@@ -256,7 +210,7 @@ func (s *ClientSuite) TestGetEventURLs(c *C) {
 	c.Assert(got, DeepEquals, want)
 }
 
-func (s *ClientSuite) TestSoftDeleteStream(c *C) {
+func (s *ClientAPISuite) TestSoftDeleteStream(c *C) {
 	streamName := "foostream"
 	mux.HandleFunc("/streams/foostream", func(w http.ResponseWriter, r *http.Request) {
 		c.Assert(r.Method, Equals, http.MethodDelete)
@@ -271,7 +225,7 @@ func (s *ClientSuite) TestSoftDeleteStream(c *C) {
 	c.Assert(resp.StatusCode, Equals, http.StatusNoContent)
 }
 
-func (s *ClientSuite) TestHardDeleteStream(c *C) {
+func (s *ClientAPISuite) TestHardDeleteStream(c *C) {
 	streamName := "foostream"
 	mux.HandleFunc("/streams/foostream", func(w http.ResponseWriter, r *http.Request) {
 		c.Assert(r.Method, Equals, http.MethodDelete)
@@ -286,7 +240,7 @@ func (s *ClientSuite) TestHardDeleteStream(c *C) {
 	c.Assert(resp.StatusCode, Equals, http.StatusNoContent)
 }
 
-func (s *ClientSuite) TestDeletingDeletedStreamReturnsDeletedError(c *C) {
+func (s *ClientAPISuite) TestDeletingDeletedStreamReturnsDeletedError(c *C) {
 	streamName := "foostream"
 	mux.HandleFunc("/streams/foostream", func(w http.ResponseWriter, r *http.Request) {
 		c.Assert(r.Method, Equals, http.MethodDelete)
@@ -298,11 +252,11 @@ func (s *ClientSuite) TestDeletingDeletedStreamReturnsDeletedError(c *C) {
 
 	resp, err := client.DeleteStream(streamName, true)
 	c.Assert(err, NotNil)
-	c.Assert(typeOf(err), Equals, "ErrDeleted")
+	c.Assert(reflect.TypeOf(err).Elem().Name(), Equals, "ErrDeleted")
 	c.Assert(resp.StatusCode, Equals, http.StatusGone)
 }
 
-func (s *ClientSuite) TestGetFeedPathForward(c *C) {
+func (s *ClientAPISuite) TestGetFeedPathForward(c *C) {
 	streamName := "foostream"
 	direction := "forward"
 	version := 0
@@ -315,7 +269,7 @@ func (s *ClientSuite) TestGetFeedPathForward(c *C) {
 	c.Assert(got, DeepEquals, want)
 }
 
-func (s *ClientSuite) TestGetFeedPathBackward(c *C) {
+func (s *ClientAPISuite) TestGetFeedPathBackward(c *C) {
 	streamName := "foostream"
 	direction := "backward"
 	version := 10
@@ -328,7 +282,7 @@ func (s *ClientSuite) TestGetFeedPathBackward(c *C) {
 	c.Assert(got, DeepEquals, want)
 }
 
-func (s *ClientSuite) TestGetFeedPathHeadBackward(c *C) {
+func (s *ClientAPISuite) TestGetFeedPathHeadBackward(c *C) {
 	streamName := "foostream"
 	direction := "backward"
 	version := -1
@@ -341,7 +295,7 @@ func (s *ClientSuite) TestGetFeedPathHeadBackward(c *C) {
 	c.Assert(got, DeepEquals, want)
 }
 
-func (s *ClientSuite) TestGetFeedPathInvalidDirection(c *C) {
+func (s *ClientAPISuite) TestGetFeedPathInvalidDirection(c *C) {
 	streamName := "foostream"
 	direction := "somethingwrong"
 	version := -1
@@ -355,7 +309,7 @@ func (s *ClientSuite) TestGetFeedPathInvalidDirection(c *C) {
 	c.Assert(err, DeepEquals, fmt.Errorf("Invalid Direction %s. Allowed values are \"forward\" or \"backward\" \n", direction))
 }
 
-func (s *ClientSuite) TestGetFeedPathInvalidDirectionAndVersion(c *C) {
+func (s *ClientAPISuite) TestGetFeedPathInvalidDirectionAndVersion(c *C) {
 	streamName := "foostream"
 	direction := "forward"
 	version := -1

@@ -3,11 +3,12 @@
 // Use of this source code is governed by a permissive BSD 3 Clause License
 // that can be found in the license file.
 
-package goes
+package goes_test
 
 import (
 	"reflect"
 
+	"github.com/jetbasrawi/go.geteventstore"
 	. "gopkg.in/check.v1"
 )
 
@@ -33,13 +34,13 @@ type MyMetaDataType struct {
 }
 
 func (s *EventSuite) TestNewEvent(c *C) {
-	uuid := NewUUID()
+	uuid := goes.NewUUID()
 	eventType := "MyEventType"
 	data := &MyDataType{Field1: 555, Field2: "Some string"}
 	meta := &MyMetaDataType{MetaField1: 1010, MetaField2: "Some meta string"}
-	want := &Event{EventID: uuid, EventType: eventType, Data: data, MetaData: meta}
+	want := &goes.Event{EventID: uuid, EventType: eventType, Data: data, MetaData: meta}
 
-	got := NewEvent(uuid, eventType, data, meta)
+	got := goes.NewEvent(uuid, eventType, data, meta)
 
 	c.Assert(got, DeepEquals, want)
 }
@@ -49,17 +50,17 @@ func (s *EventSuite) TestNewEventCreatesEventIDIfNotProvided(c *C) {
 	data := &MyDataType{Field1: 555, Field2: "Some string"}
 	meta := &MyMetaDataType{MetaField1: 1010, MetaField2: "Some meta string"}
 
-	got := NewEvent("", eventType, data, meta)
+	got := goes.NewEvent("", eventType, data, meta)
 
 	c.Assert(got.EventID, Not(Equals), "")
 }
 
 func (s *EventSuite) TestNewEventUsesTypeNameAsEventTypeIfNotProvided(c *C) {
-	uuid := NewUUID()
+	uuid := goes.NewUUID()
 	data := &MyDataType{Field1: 555, Field2: "Some string"}
 	meta := &MyMetaDataType{MetaField1: 1010, MetaField2: "Some meta string"}
 
-	got := NewEvent(uuid, "", data, meta)
+	got := goes.NewEvent(uuid, "", data, meta)
 
 	c.Assert(got.EventType, DeepEquals, reflect.TypeOf(data).Elem().Name())
 }

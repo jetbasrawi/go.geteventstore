@@ -38,8 +38,8 @@ func (e *EventResponse) PrettyPrint() string {
 
 }
 
-// eventAtomResponse is used internally to unmarshall the raw response
-type eventAtomResponse struct {
+// EventAtomResponse is used internally to unmarshall the raw response
+type EventAtomResponse struct {
 	Title   string      `json:"title"`
 	ID      string      `json:"id"`
 	Updated TimeStr     `json:"updated"`
@@ -48,14 +48,13 @@ type eventAtomResponse struct {
 }
 
 // PrettyPrint renders and indented json view of the eventAtomResponse
-func (e *eventAtomResponse) PrettyPrint() string {
+func (e *EventAtomResponse) PrettyPrint() string {
 
 	b, err := json.MarshalIndent(e, "", "	")
 	if err != nil {
 		panic(err)
 	}
 	return string(b)
-
 }
 
 // Event encapsulates the data of an eventstore event.
