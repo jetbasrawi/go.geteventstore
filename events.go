@@ -18,7 +18,7 @@ import (
 // actual event when requested as content type application/vnd.eventstore.atom+json
 //
 // For more information on the server response see:
-// http://docs.geteventstore.com/http-api/3.7.0/reading-streams/
+// http://docs.geteventstore.com/http-api/latest/reading-streams/
 type EventResponse struct {
 	Title   string
 	ID      string

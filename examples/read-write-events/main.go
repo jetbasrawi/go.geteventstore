@@ -39,7 +39,7 @@ type BarEvent struct {
 
 func main() {
 
-	// Creating a new Goes client.
+	// Create a new Goes client.
 	client, err := goes.NewClient(nil, "http://localhost:2113")
 	if err != nil {
 		log.Fatal(err)
@@ -50,20 +50,88 @@ func main() {
 
 	streamName := goes.NewUUID()
 
-	// Set up some delegates to instantiate events for deserialization
-	// of the events returned from the eventstore.
+	// Set up some delegates to instantiate events and their
+	// associated metadata for deserialization of the events
+	// returned from the eventstore.
+	// The FooEvent uses a map[string]string to represent event metadata.
+	// The BazEvent does not have any associated metadata.
 	eventActivators = make(map[string]func() (interface{}, interface{}))
 	eventActivators["FooEvent"] = func() (interface{}, interface{}) { return &FooEvent{}, make(map[string]string) }
 	eventActivators["BarEvent"] = func() (interface{}, interface{}) { return &BarEvent{}, nil }
 
-	// Write some events to the eventstore
+	// Write some events to the eventstore.
+	// See the function code.
 	writeEvents(client, streamName)
 
-	// Read the events back
+	// Read the events back.
+	// See the function code.
 	readEvents(client, streamName)
 
 	log.Println("4. The example has successfully completed.")
 
+}
+
+func writeEvents(client *goes.Client, streamName string) {
+	// Create two events and their associated metadata demonstrating how
+	// to write events and event metadata to the eventstore.
+
+	// Create an event of type FooEvent
+	event1 := &FooEvent{
+		FooField: "Lorem Ipsum",
+		BarField: "Dolor Sit Amet",
+		BazField: 42,
+	}
+
+	// Create a map for metadata. This could equally be a struct or anything that can be
+	// serialised and deserialised to JSON
+	event1Meta := make(map[string]string)
+	event1Meta["Foo"] = "consectetur adipiscing elit"
+
+	// Create a goes.Event which contains the event data and metadata.
+	//
+	// Here the eventID and EventType have been specified explicitly.
+	goesEvent1 := goes.NewEvent(goes.NewUUID(), "FooEvent", event1, event1Meta)
+
+	// Create another event of type foo event
+	event2 := &BarEvent{
+		Foo: "Contrary to popular belief, Lorem Ipsum is not simply random text.",
+		Bar: "It has roots in a piece of classical Latin literature from 45 BC.",
+		Baz: "Making it over 2000 years old.",
+	}
+
+	// This time the eventID and EventType have been left blank.
+	// The eventID will be an automatically generated uuid.
+	// The eventType will be reflected from the type and will be "BarEvent"
+	goesEvent2 := goes.NewEvent("", "", event2, nil)
+
+	//Writing to the stream
+	log.Println("")
+	log.Printf("1. Writing events to the eventstore.")
+
+	// Create a new streamwriter passing in the name of the stream you want to write to.
+	// If the stream does not exist, it will be created when events are written to it.
+	writer := client.NewStreamWriter(streamName)
+
+	// Write the events to the stream
+	// The first argument allows you to specify the expected version. Here expected version
+	// is nil and so the events will be appended at the head of the stream regardless of the
+	// version of the stream.
+	err := writer.Append(nil, goesEvent1, goesEvent2)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Println(" - Events successfully written.")
+	log.Println("2. Writing to eventstore with an expected version that should error.")
+
+	// Lets repeat this but using an expected version that will cause an error
+	// to demonstrate handling concurrency errors
+	// This should result in a goes.ErrConcurrencyViolation
+	v := 0
+	err = writer.Append(&v, goesEvent1)
+	if err != nil {
+		log.Printf(" - Received expected error. %#v\n", err)
+	}
 }
 
 func readEvents(client *goes.Client, streamName string) {
@@ -167,68 +235,5 @@ func readEvents(client *goes.Client, streamName string) {
 				log.Fatalf("Error: Could not instantiate event of type %s", reader.EventResponse().Event.EventType)
 			}
 		}
-	}
-}
-
-func writeEvents(client *goes.Client, streamName string) {
-	// Create two events and their associated metadata demonstrating how
-	// to write events and event metadata to the eventstore.
-
-	// Create an event of type FooEvent
-	event1 := &FooEvent{
-		FooField: "Lorem Ipsum",
-		BarField: "Dolor Sit Amet",
-		BazField: 42,
-	}
-
-	// Create a map for metadata. This could equally be a struct or anything that can be
-	// serialised and deserialised to JSON
-	event1Meta := make(map[string]string)
-	event1Meta["Foo"] = "consectetur adipiscing elit"
-
-	// Create a goes.Event which contains the event data and metadata.
-	//
-	// Here the eventID and EventType have been specified explicitly.
-	goesEvent1 := goes.NewEvent(goes.NewUUID(), "FooEvent", event1, event1Meta)
-
-	// Create another event of type foo event
-	event2 := &BarEvent{
-		Foo: "Contrary to popular belief, Lorem Ipsum is not simply random text.",
-		Bar: "It has roots in a piece of classical Latin literature from 45 BC.",
-		Baz: "Making it over 2000 years old.",
-	}
-
-	// This time the eventID and EventType have been left blank.
-	// The eventID will be an automatically generated uuid.
-	// The eventType will be reflected from the type and will be "BarEvent"
-	goesEvent2 := goes.NewEvent("", "", event2, nil)
-
-	//Writing to the stream
-	log.Println("")
-	log.Printf("1. Writing events to the eventstore.")
-
-	// Create a new streamwriter passing in the name of the stream you want to write to.
-	// If the stream does not exist, it will be created when events are written to it.
-	writer := client.NewStreamWriter(streamName)
-
-	// Write the events to the stream
-	// The first argument allows you to specify the expected version. Here expected version
-	// is nil and so the events will be appended at the head of the stream regardless of the
-	// version of the stream.
-	err := writer.Append(nil, goesEvent1, goesEvent2)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	log.Println(" - Events successfully written.")
-	log.Println("2. Writing to eventstore with an expected version that should error.")
-
-	// Lets repeat this but using an expected version that will cause an error
-	// to demonstrate handling concurrency errors
-	// This should result in a goes.ErrConcurrencyViolation
-	v := 0
-	err = writer.Append(&v, goesEvent1)
-	if err != nil {
-		log.Printf(" - Received expected error. %#v\n", err)
 	}
 }

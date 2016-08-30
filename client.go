@@ -268,7 +268,7 @@ func (c *Client) GetFeedPath(stream, direction string, version int, pageSize int
 // according to the documentation the metadata url should be acquired through
 // a query to the stream feed as the authors of GetEventStore reserve the right
 // to change the url.
-// http://docs.geteventstore.com/http-api/3.7.0/stream-metadata/
+// http://docs.geteventstore.com/http-api/latest/stream-metadata/
 func (c *Client) GetMetadataURL(stream string) (string, *Response, error) {
 
 	url, err := c.GetFeedPath(stream, "forward", 0, 1)
