@@ -5,7 +5,7 @@ Go.GetEventStore is a http client for [GetEventStore](https://geteventstore.com)
 client abstracts interaction with the GetEventStore HTTP API providing easy to use features 
 for reading and writing of events and event metadata.
 
-##CQRS Reference implementation
+##CQRS reference implementation
 An full example CQRS implementation using go.geteventstore can be found at [go.cqrs](https://github.com/jetbasrawi/go.cqrs)
 
 ###Supported features
