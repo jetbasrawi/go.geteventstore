@@ -202,6 +202,13 @@ You will also need the Check.V1 package which is used for assertions in unit tes
     $ go get gopkg.in/check.v1
 ```
 
+After this you should be able to run the tests as normal for any Golang project with unit tests.
+
+``` 
+    $ go test
+
+```
+
 ###Feedback and requests welcome
 
 This is a pretty new piece of work and criticism, comments or complements are most welcome.
