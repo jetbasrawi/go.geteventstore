@@ -185,6 +185,22 @@ ES-RequiresMaster or ES-TrustedAuth.
     client.DeleteHeader("ES-ResolveLinkTo")
 
 ```
+###Running the Unit Tests
+To keep the library lightweight and easy to use, I have tried not to have any dependencies on other 
+packages. To use the package there are no dependencies, to run the unit tests however, the package does require 
+some dependencies.
+
+You will need the go.geteventstore.testfeed package.
+
+```
+    $ go get github.com/jetbasrawi/go.geteventstore.testfeed
+
+```
+You will also need the Check.V1 package which is used for assertions in unit tests.
+
+```
+    $ go get gopkg.in/check.v1
+```
 
 ###Feedback and requests welcome
 
