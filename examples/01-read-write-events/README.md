@@ -4,7 +4,7 @@ This example demonstrates how to use the goes client to write events and event m
 
 The example is simple and well commented and should explain how everything works.
 
-Once the server is up simply **go run** main.go from the read-write-event directory.
+Once the GetEventStore server is up simply **go run** main.go from the read-write-event directory.
 
 ```
 $ go run main.go

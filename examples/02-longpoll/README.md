@@ -5,7 +5,7 @@ events. This is sometimes called a catch-up subscription.
 
 This example demonstrates how to do this.
 
-Once the server is up simply **go run** the examples.
+Once the GetEventStore server is up simply **go run** the examples.
 
 ```
     $ go run main.go
