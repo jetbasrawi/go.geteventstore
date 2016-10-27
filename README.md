@@ -27,7 +27,7 @@ the client in more detail, heavily commented example code can be found in the ex
 
 ###Get the package
 ```
-    $ go get github.com/jetbasrawi/go.geteventstore"
+    $ go get github.com/jetbasrawi/go.geteventstore
 ```
 
 ###Import the package
