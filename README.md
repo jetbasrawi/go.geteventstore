@@ -24,7 +24,7 @@ the client in more detail, heavily commented example code can be found in the ex
 
 ###Get the package
 ```
-    $ go get github.com/jetbasrawi/go.geteventstore"
+    $ go get github.com/jetbasrawi/go.geteventstore
 ```
 Go.GetEventStore does not depend on any imported packages outside of the Go standard packages. 
 
