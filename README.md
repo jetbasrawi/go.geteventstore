@@ -32,7 +32,7 @@ the client in more detail, heavily commented example code can be found in the ex
 
 ###Import the package
 ```go 
-    import "github.com/jetbasrawi/go.geteventstore"
+    import "github.com/jetbasrawi/go.geteventstore
 ```
 
 ###Create a new client
