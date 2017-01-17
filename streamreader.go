@@ -122,7 +122,6 @@ func (s *StreamReader) Next() bool {
 	e, _, err := s.client.GetEvent(url)
 	if err != nil {
 		s.lasterr = err
-		return true
 	}
 	s.eventResponse = e
 	s.version = s.nextVersion
