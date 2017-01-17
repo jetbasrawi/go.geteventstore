@@ -29,7 +29,7 @@ type ErrDeleted struct {
 }
 
 func (e ErrDeleted) Error() string {
-	return "The stream has was deleted."
+	return "The stream has been deleted."
 }
 
 // ErrUnauthorized is returned when a request to the eventstore is
