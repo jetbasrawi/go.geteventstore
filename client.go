@@ -127,6 +127,17 @@ func (c *Client) NewStreamReader(streamName string) *StreamReader {
 	}
 }
 
+// NewPagedStreamReader returns a new *StreamReader that jumps to a designated page
+func (c *Client) NewPagedStreamReader(streamName string, page int, lastEventNumber int) *StreamReader {
+	return &StreamReader{
+		streamName:  streamName,
+		client:      c,
+		version:     lastEventNumber,
+		nextVersion: lastEventNumber + 1,
+		pageSize:    page,
+	}
+}
+
 // NewStreamWriter returns a new *StreamWriter.
 func (c *Client) NewStreamWriter(streamName string) *StreamWriter {
 	return &StreamWriter{
