@@ -1,14 +1,15 @@
-#Go.GetEventStore [![license](https://img.shields.io/badge/license-BSD-blue.svg?maxAge=2592000)](https://github.com/jetbasrawi/go.geteventstore/blob/master/LICENSE.md) [![Go Report Card](https://goreportcard.com/badge/github.com/jetbasrawi/go.geteventstore)](https://goreportcard.com/report/github.com/jetbasrawi/go.geteventstore) [![GoDoc](https://godoc.org/github.com/jetbasrawi/go.geteventstore?status.svg)](https://godoc.org/github.com/jetbasrawi/go.geteventstore)
+# Go.GetEventStore 
+[![license](https://img.shields.io/badge/license-BSD-blue.svg?maxAge=2592000)](https://github.com/jetbasrawi/go.geteventstore/blob/master/LICENSE.md) [![Go Report Card](https://goreportcard.com/badge/github.com/jetbasrawi/go.geteventstore)](https://goreportcard.com/report/github.com/jetbasrawi/go.geteventstore) [![GoDoc](https://godoc.org/github.com/jetbasrawi/go.geteventstore?status.svg)](https://godoc.org/github.com/jetbasrawi/go.geteventstore)
 
-##A Golang client for EventStore 3.x HTTP API. 
+## A Golang client for EventStore 3.x HTTP API. 
 Go.GetEventStore is a http client for [GetEventStore](https://geteventstore.com) written in Go. The 
 client abstracts interaction with the GetEventStore HTTP API providing easy to use features 
 for reading and writing of events and event metadata.
 
-##CQRS reference implementation
+## CQRS reference implementation
 An full example CQRS implementation using go.geteventstore can be found at [go.cqrs](https://github.com/jetbasrawi/go.cqrs)
 
-###Supported features
+### Supported features
 | Feature | Description |
 |---------|-------------|
 | **Write Events & Event Metadata** | Writing single and multiple events to a stream. Optionally expected version can be provided if you want to use optimistic concurrency features of the eventstore. |
@@ -25,17 +26,17 @@ An full example CQRS implementation using go.geteventstore can be found at [go.c
 Below are some code examples giving a summary view of how the client works. To learn to use 
 the client in more detail, heavily commented example code can be found in the examples directory.
 
-###Get the package
+### Get the package
 ```
     $ go get github.com/jetbasrawi/go.geteventstore
 ```
 
-###Import the package
+### Import the package
 ```go 
     import "github.com/jetbasrawi/go.geteventstore"
 ```
 
-###Create a new client
+### Create a new client
 
 ```go
     client, err := goes.NewClient(nil, "http://youreventstore:2113")
@@ -45,7 +46,7 @@ the client in more detail, heavily commented example code can be found in the ex
 
 ```
 
-###Set basic authentication
+### Set basic authentication
 
 If required, you can set authentication on the client. Credentials can be changed at any time.
 Requests are made with the credentials that were set last or none if none are set.
@@ -56,7 +57,7 @@ Requests are made with the credentials that were set last or none if none are se
 
 ```
 
-###Write events and event Metadata
+### Write events and event Metadata
 
 Writing events and event metadata are supported via the StreamWriter. 
 
@@ -88,7 +89,7 @@ Writing events and event metadata are supported via the StreamWriter.
 
 ```
 
-###Read events
+### Read events
 
 Reading events using the goes.StreamReader loosely follows the iterator idiom used in 
 the "database/sql" package and other go libraries that deal with databases. This idiom 
@@ -124,7 +125,7 @@ events can be found in the longpoll example.
 
 ```
 
-###Long polling head of a stream
+### Long polling head of a stream
 
 LongPoll provides an easy and efficient way to poll a stream listening for new events. 
 The server will wait the specified amount of time or until new events are available on 
@@ -151,7 +152,7 @@ a stream.
 
 A more detailed example of using LongPoll can be found in the examples directory.
 
-###Deleting streams
+### Deleting streams
 
 The client supports both soft delete and hard delete of event streams. 
 
@@ -165,7 +166,7 @@ The client supports both soft delete and hard delete of event streams.
 
 Example code for deleting streams can be found in the examples directory.
 
-###Direct use of the client
+### Direct use of the client
 
 The StreamReader and StreamWriter types are the easiest way to read and write events. If you would like to implement
 some other logic around reading events, some methods are available on the Client type. An example is included 
@@ -185,7 +186,7 @@ ES-RequiresMaster or ES-TrustedAuth.
     client.DeleteHeader("ES-ResolveLinkTo")
 
 ```
-###Running the Unit Tests
+### Running the Unit Tests
 To keep the library lightweight and easy to use, I have tried not to have any dependencies on other 
 packages. To use the package there are no dependencies, to run the unit tests however, the package does require 
 some dependencies.
@@ -209,7 +210,7 @@ After this you should be able to run the tests as normal for any Golang project 
 
 ```
 
-###Feedback and requests welcome
+### Feedback and requests welcome
 
 This is a pretty new piece of work and criticism, comments or complements are most welcome.
 
