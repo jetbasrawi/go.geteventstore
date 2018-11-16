@@ -117,14 +117,29 @@ func NewClient(httpClient *http.Client, serverURL string) (*Client, error) {
 	return c, nil
 }
 
+func (c *Client) copy() *Client {
+	client := &Client{
+		client:      c.client,
+		baseURL:     c.baseURL,
+		credentials: c.credentials,
+		headers:     make(map[string]string),
+	}
+	for k, v := range c.headers {
+		client.headers[k] = v
+	}
+	return client
+}
+
 // NewStreamReader returns a new *StreamReader.
 func (c *Client) NewStreamReader(streamName string) *StreamReader {
-	return &StreamReader{
+	sr := &StreamReader{
 		streamName: streamName,
-		client:     c,
+		client:     c.copy(),
 		version:    -1,
 		pageSize:   20,
 	}
+	sr.LongPoll(-1)
+	return sr
 }
 
 // NewStreamWriter returns a new *StreamWriter.
