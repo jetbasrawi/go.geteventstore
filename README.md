@@ -210,11 +210,5 @@ After this you should be able to run the tests as normal for any Golang project 
 
 ```
 
-### Feedback and requests welcome
-
-This is a pretty new piece of work and criticism, comments or complements are most welcome.
-
-
-
 
 
