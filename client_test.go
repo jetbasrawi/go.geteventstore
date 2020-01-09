@@ -7,7 +7,6 @@ package goes_test
 
 import (
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -86,17 +85,6 @@ func (s *ClientAPISuite) TestRequestsAreSentWithBasicAuthIfSet(c *C) {
 	streamReader := client.NewStreamReader("something")
 	_ = streamReader.Next()
 	c.Assert(authFound, Equals, true)
-}
-
-func (s *ClientAPISuite) TestNewRequestWithInvalidJSONReturnsError(c *C) {
-	type T struct {
-		A map[int]interface{}
-	}
-	ti := &T{}
-	_, err := client.NewRequest(http.MethodGet, "/", ti)
-	c.Assert(err, NotNil)
-	tp := reflect.TypeOf(ti.A)
-	c.Assert(err, FitsTypeOf, &json.UnsupportedTypeError{Type: tp})
 }
 
 func (s *ClientAPISuite) TestNewRequestWithBadURLReturnsError(c *C) {
